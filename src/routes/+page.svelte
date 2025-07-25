@@ -80,6 +80,30 @@
 		playerYaw: number
 		input: any
 		inputEventToListenerList: any
+		rainDropConstHeightGround: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropConstGravity: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropSpawnHeightAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropSpawnHeightVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropWidthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropWidthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropAngleOfAttackAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropAngleOfAttackVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropLengthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropLengthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropMassAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropMassVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletInnerRadiusOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletInnerRadiusOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletOuterRadiusOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletOuterRadiusOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletMaxLifetimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletMaxLifetimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		rainDropStruct: THREE.TSL.Struct
+		waveletStruct: THREE.TSL.Struct
+		waveletMinOpacityAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletMinOpacityVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletOpacityOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletOpacityOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 
 		constructor() {
 			// ======================================================
@@ -190,6 +214,61 @@
 				this.playerPitch = 0
 				this.playerYaw = 0
 			}
+			// ======================================================
+			// =                                                    =
+			// =                  INIT BUFFERS                      =
+			// =                                                    =
+			// =                                                    =
+			// ======================================================
+			this.rainDropConstHeightGround = uniform(0.0)
+			this.rainDropConstGravity = uniform(9.8)
+			this.rainDropSpawnHeightAverage = uniform(6) // low for debugging purposes
+			this.rainDropSpawnHeightVariance = uniform(3)
+
+			this.rainDropWidthAverage = uniform(0.01)
+			this.rainDropWidthVariance = uniform(0.05)
+			this.rainDropAngleOfAttackAverage = uniform(15) // in degrees
+			this.rainDropAngleOfAttackVariance = uniform(5)
+			// the length might have to be modified with time as well but we'll see
+			this.rainDropLengthAverage = uniform(0.1) // in m
+			this.rainDropLengthVariance = uniform(0.08)
+			this.rainDropMassAverage = uniform(0.001) // in kg
+			this.rainDropMassVariance = uniform(0.0001)
+
+			// TODO: need to have very fine grain control over the radius over time... the radius over time of the our radius must converge to less than the inner radius growth at some point
+
+			this.waveletInnerRadiusOverTimeAverage = uniform(0.01) // in m / s
+			this.waveletInnerRadiusOverTimeVariance = uniform(0.005) // can be a function of time, but this is currently not easily modifiable via the gui so will have to keep as const for now
+			this.waveletOuterRadiusOverTimeAverage = uniform(0.02) // can be a function of time
+			this.waveletOuterRadiusOverTimeVariance = uniform(0.01)
+			this.waveletMaxLifetimeAverage = uniform(1) // in seconds
+			this.waveletMaxLifetimeVariance = uniform(0.5)
+
+			this.waveletMinOpacityAverage = uniform(0.3)
+			this.waveletMinOpacityVariance = uniform(0.1)
+			this.waveletOpacityOverTimeAverage = uniform(-0.1)
+			this.waveletOpacityOverTimeVariance = uniform(0.05)
+
+			this.rainDropStruct = struct({
+				position: { type: 'vec3' },
+				velocity: { type: 'vec3' },
+				width: 'float',
+				length: 'float',
+				angleOfAttack: 'float',
+				mass: 'float'
+			})
+
+			this.waveletStruct = struct({
+				position: { type: 'vec3' },
+				innerRadius: 'float',
+				innerRadiusGrowthRate: 'float',
+				outerRadius: 'float',
+				outerRadiusGrowthRate: 'float',
+				lifetime: 'float',
+				maxLifeTime: 'float',
+				opacity: 'float',
+				opacityGrowthRate: 'float'
+			})
 		}
 		// ======================================================
 		// =                                                    =
