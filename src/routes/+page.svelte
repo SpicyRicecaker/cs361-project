@@ -71,18 +71,17 @@
 		playerVelocity: THREE.Vector3
 		playerForward: THREE.Vector3
 		playerRight: THREE.Vector3
+		playerForwardDefault: THREE.Vector3
 		playerUp: THREE.Vector3
-        inputAcceptedKeys: string[]
+		inputAcceptedKeys: string[]
 		inputKeysHeld: any
+		inputMouseDown: boolean
+		playerPitch: number
+		playerYaw: number
+		input: any
+		inputEventToListenerList: any
 
 		constructor() {
-			this.gameLoop = this.gameLoop.bind(this)
-			this.onWindowResize = this.onWindowResize.bind(this)
-			this.handleHeldKeys = this.handleHeldKeys.bind(this)
-			this.handleKeyDown = this.handleKeyDown.bind(this)
-			this.handleKeyUp = this.handleKeyUp.bind(this)
-			this.tick = this.tick.bind(this)
-			this.render = this.render.bind(this)
 			// ======================================================
 			// =                                                    =
 			// =                  CREATE GUI                        =
@@ -122,13 +121,11 @@
 			this.renderer.domElement.id = 'renderer'
 			document.getElementById('renderer')?.remove()
 			document.body.appendChild(this.renderer.domElement)
-			// setup listeners
-			window.addEventListener('keydown', this.handleKeyDown)
-			window.addEventListener('keyup', this.handleKeyUp)
 			// add controls
 			{
 				// TODO can replace with logic for manipulating camera i've done it 1000 times
 				// this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+				// this.controls.enabled = false
 			}
 			// ======================================================
 			// =                                                    =
@@ -155,31 +152,83 @@
 			}
 			// init input
 			{
-                this.inputAcceptedKeys = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft', 'Space']
+				this.inputAcceptedKeys = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft', 'Space']
 				this.inputKeysHeld = {}
 				this.inputAcceptedKeys.forEach((el) => {
 					this.inputKeysHeld[el] = false
 				})
+				this.inputMouseDown = false
+
+				// setup listeners
+				{
+					this.inputEventToListenerList = {
+						resize: this.onWindowResize,
+						keydown: this.handleKeyDown,
+						keyup: this.handleKeyUp,
+						mousedown: this.handleMouseDown,
+						mouseup: this.handleMouseUp,
+						mousemove: this.handleMouseMove
+					}
+					Object.entries(this.inputEventToListenerList).forEach(([v, k]) =>
+						(window as any).addEventListener(v, k)
+					)
+				}
 			}
-			// init player
+			// ======================================================
+			// =                                                    =
+			// =                  INIT PLAYER                       =
+			// =                                                    =
+			// =                                                    =
+			// ======================================================
+			// region player
 			{
 				this.playerVelocity = new THREE.Vector3(0, 0, 0)
+				this.playerForwardDefault = new THREE.Vector3(0, 1, 0)
 				this.playerForward = new THREE.Vector3(0, 1, 0)
 				this.playerRight = new THREE.Vector3(1, 0, 0)
 				this.playerUp = new THREE.Vector3(0, 0, 1)
+				this.playerPitch = 0
+				this.playerYaw = 0
 			}
 		}
-		handleKeyUp(e: KeyboardEvent) {
+		// ======================================================
+		// =                                                    =
+		// =                  HANDLER FUNCTIONS                 =
+		// =                                                    =
+		// =                                                    =
+		// ======================================================
+		// region handlers
+		handleMouseUp = (e: MouseEvent) => {
+			this.inputMouseDown = false
+		}
+
+		handleMouseDown = (e: MouseEvent) => {
+			this.inputMouseDown = true
+		}
+
+		handleMouseMove = (e: MouseEvent) => {
+			const pitchYawConversionFactor = 0.2
+			if (this.inputMouseDown) {
+				this.playerPitch = mClamp(
+					this.playerPitch - e.movementY * pitchYawConversionFactor,
+					-90,
+					90
+				)
+				this.playerYaw = this.playerYaw - e.movementX * pitchYawConversionFactor
+			}
+		}
+
+		handleKeyUp = (e: KeyboardEvent) => {
 			if (this.inputAcceptedKeys.includes(e.code)) {
 				this.inputKeysHeld[e.code] = false
 			}
 		}
-		handleKeyDown(e: KeyboardEvent) {
+		handleKeyDown = (e: KeyboardEvent) => {
 			if (this.inputAcceptedKeys.includes(e.code)) {
 				this.inputKeysHeld[e.code] = true
 			}
 		}
-		handleHeldKeys() {
+		handleHeldKeys = () => {
 			const walkVelocity = 0.01
 			if (this.inputKeysHeld['KeyW']) {
 				this.playerVelocity.add(this.playerForward.clone().multiplyScalar(walkVelocity))
@@ -199,18 +248,47 @@
 			if (this.inputKeysHeld['ShiftLeft']) {
 				this.playerVelocity.sub(this.playerUp.clone().multiplyScalar(walkVelocity))
 			}
+			// ======================================================
+			// =                                                    =
+			// =                CLEANUP HOT RELOAD                  =
+			// =                                                    =
+			// =                                                    =
+			// ======================================================
+			if (import.meta.hot) {
+				import.meta.hot.dispose(() => {
+					Object.entries(this.inputEventToListenerList).forEach(([v, k]) =>
+						(window as any).removeEventListener(v, k)
+					)
+				})
+			}
 		}
-		onWindowResize() {
+		onWindowResize = () => {
 			// Update the camera's aspect ratio and the renderer's size to reflect
 			// the new screen dimensions upon a browser window resize.
 			this.camera.aspect = window.innerWidth / window.innerHeight
 			this.camera.updateProjectionMatrix()
 			this.renderer.setSize(window.innerWidth, window.innerHeight)
 		}
-
-		async tick() {
+		// ======================================================
+		// =                                                    =
+		// =                  TICK                              =
+		// =                                                    =
+		// =                                                    =
+		// ======================================================
+		// region tick
+		tick = async () => {
 			// update player
 			{
+				// ================== [ COMPUTE CAM VECTORS ] ==================
+				const eulerPitch = new THREE.Euler(mRadians(this.playerPitch), 0, 0)
+				// keep in mind that this could change if player is picking
+				// the right or the left
+				const eulerYaw = new THREE.Euler(0, 0, mRadians(this.playerYaw))
+				this.playerForward = this.playerForwardDefault.clone().applyEuler(eulerPitch)
+				this.playerForward.applyEuler(eulerYaw)
+				this.playerRight.crossVectors(this.playerForward, this.playerUp)
+				this.camera.lookAt(this.camera.position.clone().add(this.playerForward))
+
 				this.playerVelocity.set(0, 0, 0)
 				this.handleHeldKeys()
 				// recalculate forward
@@ -223,21 +301,37 @@
 			}
 		}
 
-		async render() {
-			// region animate
+		// ======================================================
+		// =                                                    =
+		// =                  render                            =
+		// =                                                    =
+		// =                                                    =
+		// ======================================================
+		// region render
+		render = async () => {
 			await this.renderer.render(this.scene, this.camera)
 		}
 
-		async gameLoop() {
+		gameLoop = async () => {
 			await this.tick()
 			await this.render()
 		}
 
-		async init() {
+		// ======================================================
+		// =                                                    =
+		// =                  init                              =
+		// =                                                    =
+		// =                                                    =
+		// ======================================================
+		init = async () => {
 			// region init
 			await this.renderer.setAnimationLoop(this.gameLoop)
 		}
 	}
+
+	const mClamp = (n: number, a: number, b: number) => Math.min(Math.max(n, a), b)
+
+	const mRadians = (deg: number) => (deg * Math.PI) / 180
 
 	let game: Game | null = null
 	onMount(async () => {
