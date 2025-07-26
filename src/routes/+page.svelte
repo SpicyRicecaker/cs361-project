@@ -80,30 +80,39 @@
 		playerYaw: number
 		input: any
 		inputEventToListenerList: any
-		rainDropConstHeightGround: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropConstGravity: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropSpawnHeightAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropSpawnHeightVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropWidthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropWidthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropAngleOfAttackAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropAngleOfAttackVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropLengthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropLengthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropMassAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropMassVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropConstHeightGround: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropConstGravity: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropSpawnHeightAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropSpawnHeightVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropWidthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropWidthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropAngleOfAttackAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropAngleOfAttackVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropLengthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropLengthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropMassAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropMassVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletInnerRadiusOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletInnerRadiusOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletOuterRadiusOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletOuterRadiusOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletMaxLifetimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletMaxLifetimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		rainDropStruct: THREE.TSL.Struct
+		raindropStruct: THREE.TSL.Struct
 		waveletStruct: THREE.TSL.Struct
 		waveletMinOpacityAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletMinOpacityVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletOpacityOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletOpacityOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropN: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindrops: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
+		wavelets: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
+		raindropEnabledN: THREE.TSL.ShaderNodeObject<THREE.UniformNode<any>>
+		rainDropN: any
+		raindropsMeshGeometry: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
+		raindropsMeshIndices: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
+		raindropsMesh: THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap>
+		randropsMeshGeometry: any
 
 		constructor() {
 			// ======================================================
@@ -220,20 +229,22 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.rainDropConstHeightGround = uniform(0.0)
-			this.rainDropConstGravity = uniform(9.8)
-			this.rainDropSpawnHeightAverage = uniform(6) // low for debugging purposes
-			this.rainDropSpawnHeightVariance = uniform(3)
+			this.raindropN = uniform(50)
+			this.raindropEnabledN = uniform(this.rainDropN.value)
+			this.raindropConstHeightGround = uniform(0.0)
+			this.raindropConstGravity = uniform(9.8)
+			this.raindropSpawnHeightAverage = uniform(6) // low for debugging purposes
+			this.raindropSpawnHeightVariance = uniform(3)
 
-			this.rainDropWidthAverage = uniform(0.01)
-			this.rainDropWidthVariance = uniform(0.05)
-			this.rainDropAngleOfAttackAverage = uniform(15) // in degrees
-			this.rainDropAngleOfAttackVariance = uniform(5)
+			this.raindropWidthAverage = uniform(0.01)
+			this.raindropWidthVariance = uniform(0.05)
+			this.raindropAngleOfAttackAverage = uniform(15) // in degrees
+			this.raindropAngleOfAttackVariance = uniform(5)
 			// the length might have to be modified with time as well but we'll see
-			this.rainDropLengthAverage = uniform(0.1) // in m
-			this.rainDropLengthVariance = uniform(0.08)
-			this.rainDropMassAverage = uniform(0.001) // in kg
-			this.rainDropMassVariance = uniform(0.0001)
+			this.raindropLengthAverage = uniform(0.1) // in m
+			this.raindropLengthVariance = uniform(0.08)
+			this.raindropMassAverage = uniform(0.001) // in kg
+			this.raindropMassVariance = uniform(0.0001)
 
 			// TODO: need to have very fine grain control over the radius over time... the radius over time of the our radius must converge to less than the inner radius growth at some point
 
@@ -249,7 +260,7 @@
 			this.waveletOpacityOverTimeAverage = uniform(-0.1)
 			this.waveletOpacityOverTimeVariance = uniform(0.05)
 
-			this.rainDropStruct = struct({
+			this.raindropStruct = struct({
 				position: { type: 'vec3' },
 				velocity: { type: 'vec3' },
 				width: 'float',
@@ -269,6 +280,34 @@
 				opacity: 'float',
 				opacityGrowthRate: 'float'
 			})
+
+			this.raindrops = instancedArray(this.raindropN.value, this.raindropStruct)
+			this.wavelets = instancedArray(this.raindropN.value, this.waveletStruct)
+			// holds the geometry for the raindrop
+			{
+				this.raindropsMeshGeometry = instancedArray(this.raindropN.value * 4, 'vec3')
+				// initialize mesh indices
+				const raindropsMeshIndices = new Uint32Array(this.raindropN.value * 6)
+				// going to do it on cpu for now, could optimize this later
+				for (let i = 0; i < this.raindropN.value; i++) {
+					// HOMETOWNMD 1
+					raindropsMeshIndices[i * 6] = i * 4
+					raindropsMeshIndices[i * 6 + 1] = i * 4 + 1
+					raindropsMeshIndices[i * 6 + 2] = i * 4 + 2
+					raindropsMeshIndices[i * 6 + 3] = i * 4 + 1
+					raindropsMeshIndices[i * 6 + 4] = i * 4 + 2
+					raindropsMeshIndices[i * 6 + 5] = i * 4 + 3
+				}
+				this.raindropsMeshIndices = instancedArray(raindropsMeshIndices, 'uint')
+
+				this.raindropsMesh = new THREE.BufferGeometry()
+
+					this.randropsMeshGeometry,
+					this.raindropsMeshIndices
+				// inside each raindrop's compute cell:
+				//   update the 4 vertices associated with the raindrop
+				//     specifically, this.raindropVertices
+			}
 		}
 		// ======================================================
 		// =                                                    =
