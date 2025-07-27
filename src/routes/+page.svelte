@@ -122,6 +122,11 @@
 		initRaindrops: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 		raindropsComputeMeshGeometry: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 		raindropsMeshVertexNode: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
+		rawGPUSushiPlate: Float32Array<ArrayBuffer>
+		gpuSushiPlate: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
+		debugRaindropsMaterial: THREE.SpriteNodeMaterial
+		debugRaindropRadius: any
+		debugRaindrops: THREE.Sprite<THREE.Object3DEventMap>
 
 		constructor() {
 			// ======================================================
@@ -175,6 +180,7 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
+			// region scene
 			this.scene = new THREE.Scene()
 			this.scene.background = new THREE.Color(0x000000)
 			// add debug plane geometry
@@ -299,6 +305,14 @@
 
 			this.raindrops = instancedArray(this.raindropN.value, this.raindropStruct)
 			this.wavelets = instancedArray(this.raindropN.value, this.waveletStruct)
+
+
+			// ======================================================
+			// =                                                    =
+			// =                  RAINDROP STUFF                    =
+			// =                                                    =
+			// =                                                    =
+			// ======================================================
 			// holds the geometry for the raindrop
 			{
 				this.raindropsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropN.value * 4, 3)
@@ -322,7 +336,6 @@
 				this.raindropsMeshMaterial = new THREE.MeshBasicMaterial()
 				this.raindropsMeshMaterial.color = new THREE.Color(1, 1, 1)
 
-
 				this.raindropsMesh = new THREE.Mesh(this.raindropsMeshGeometry, this.raindropsMeshMaterial)
 
 				this.scene.add(this.raindropsMesh)
@@ -335,6 +348,14 @@
 				// inside each raindrop's compute cell:
 				//   update the 4 vertices associated with the raindrop
 				//     specifically, this.raindropsVertices
+
+				// ======================================================
+				// =                                                    =
+				// =                  RAIN INITIALIZER                  =
+				// =                                                    =
+				// =                                                    =
+				// ======================================================
+				// region init raindrops 
 				this.initRaindrops = Fn(() => {
 					// by default, allocate ~20 random seeds for each and every
 					// raindrop
@@ -390,6 +411,14 @@
 						.assign(mass)
 				})().compute(this.raindropN.value)
 
+				// ======================================================
+				// =                                                    =
+				// =                  RAIN MESH COMPUTE                 =
+				// =                                                    =
+				// =                                                    =
+				// ======================================================
+
+				// region rain mesh compute
 				this.raindropsComputeMeshGeometry = Fn(() => {
 					const raindrop = this.raindrops.element(instanceIndex)
 
@@ -461,7 +490,42 @@
 				})()
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
+
+				// region debug spheres
+				{
+					this.debugRaindropsMaterial = new THREE.SpriteNodeMaterial()
+					this.debugRaindropsMaterial.colorNode = color(0, 0, 0.7)
+					this.debugRaindropsMaterial.positionNode = (() => {
+						const a = new Float32Array(6)
+						a[0] = 0
+						a[1] = 0
+						a[2] = 0
+						a[3] = .2
+						a[4] = 0
+						a[5] = 0
+						return instancedArray(a, 'vec3').toAttribute()
+					})()
+					// this.raindropsVerticesSBA
+					this.debugRaindropRadius = uniform(0.01)
+					this.debugRaindropsMaterial.scaleNode = this.debugRaindropRadius
+					// TODO I have no idea what this opacityNode does lol
+					this.debugRaindropsMaterial.opacityNode = shapeCircle()
+
+					this.debugRaindrops = new THREE.Sprite(this.debugRaindropsMaterial)
+					// this.debugRaindrops.count = this.raindropN.value
+					this.debugRaindrops.count = 2
+					this.scene.add(this.debugRaindrops)
+				}
 			}
+			// region gpu
+			this.rawGPUSushiPlate = null
+			this.gpuSushiPlate = instancedArray(3, 'vec3')
+			this.initGPUSushiPlate = Fn(() => {
+				this.gpuSushiPlate.element(instanceIndex).assign(vec3(0, 0, 0))
+			})().compute(3)
+			this.updateGPUSushiPlate = Fn(() => {
+				this.gpuSushiPlate.element(0).assign(this.raindrops.element(0).get('position'))
+			})().compute(1)
 		}
 		// ======================================================
 		// =                                                    =
@@ -573,6 +637,17 @@
 			}
 			// update the raindropsMeshGeometry
 			await this.renderer.computeAsync(this.raindropsComputeMeshGeometry)
+
+			// await this.renderer.computeAsync(this.updateGPUSushiPlate)
+
+			// // inside animate, update gpuSushiPlate -> rawGPUSushiPlate
+			// {
+			// 	// run the async buffer update code
+			// 	this.rawGPUSushiPlate = new Float32Array(
+			// 		await this.renderer.getArrayBufferAsync(this.gpuSushiPlate.value)
+			// 	)
+			// 	console.log(this.rawGPUSushiPlate)
+			// }
 		}
 
 		// ======================================================
@@ -599,6 +674,8 @@
 		// ======================================================
 		init = async () => {
 			await this.renderer.computeAsync(this.initRaindrops)
+
+			await this.renderer.computeAsync(this.initGPUSushiPlate)
 
 			// region init
 			await this.renderer.setAnimationLoop(this.gameLoop)
