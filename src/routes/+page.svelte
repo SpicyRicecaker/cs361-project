@@ -37,6 +37,7 @@
 		modelWorldMatrix,
 		modelWorldMatrixInverse,
 		radians,
+		rotate,
 		shapeCircle,
 		sin,
 		sqrt,
@@ -49,6 +50,7 @@
 		uvec2,
 		varying,
 		varyingProperty,
+		vec2,
 		vec3,
 		vec4,
 		vertexIndex,
@@ -118,6 +120,8 @@
 		planeW: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		planeH: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		initRaindrops: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
+		raindropsComputeMeshGeometry: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
+		raindropsMeshVertexNode: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
 
 		constructor() {
 			// ======================================================
@@ -318,6 +322,7 @@
 				this.raindropsMeshMaterial = new THREE.MeshBasicMaterial()
 				this.raindropsMeshMaterial.color = new THREE.Color(1, 1, 1)
 
+
 				this.raindropsMesh = new THREE.Mesh(this.raindropsMeshGeometry, this.raindropsMeshMaterial)
 
 				this.scene.add(this.raindropsMesh)
@@ -350,7 +355,7 @@
 					const y = this.planeH.mul(
 						n1P1(baseSeedIndex.add(2)).div(2))
 					// determine angle of attack
-					const theta = this.raindropAngleOfAttackAverage.add(
+					const alpha = this.raindropAngleOfAttackAverage.add(
 						this.raindropAngleOfAttackVariance.mul(
 							n1P1(baseSeedIndex.add(3)).div(2))
 					)
@@ -380,9 +385,82 @@
 					raindrop.get('length')
 						.assign(length)
 					raindrop.get('angleOfAttack')
-					
-					
+						.assign(alpha)
+					raindrop.get('mass')
+						.assign(mass)
 				})().compute(this.raindropN.value)
+
+				this.raindropsComputeMeshGeometry = Fn(() => {
+					const raindrop = this.raindrops.element(instanceIndex)
+
+					const a = raindrop.get('position')
+
+					const cameraSpacePos = a.mul(cameraViewMatrix)
+
+					// construct a 2d vector of length pointing to +x
+					const length = raindrop.get('length')
+					const width = raindrop.get('width')
+					const vToTail = vec2(1, 0).mul(length)
+					// rotate the 2d vector by the angle of attack
+					const alpha = raindrop.get('angleOfAttack')
+					const vToTailPrime = rotate(vToTail, alpha)
+					const b = a.add(vToTailPrime)
+
+					//     | <- b
+					//    |
+					//   |
+					//  |
+					// | <- a
+
+					// 0 --- 2
+					// |   / |
+					// |  /  |
+					// |/    |
+					// 1 --- 3
+
+					const left = vec2(-1, 0).mul(width)
+					const right = vec2(1, 0).mul(width)
+					// for the first coordinate
+					//   push to the left (literally (-1, 0, 0)), multiply by width, and assign to 1
+					//   push to the right (literally (-1, 0, 0)), multiply by width, and assign to 3
+					const p1 = a.add(left)
+					const p3 = a.add(right)
+					
+
+					// for the second coordinate
+					//   push to the left (literally (-1, 0, 0)), multiply by width, and assign to 0
+					//   push to the right (literally (-1, 0, 0)), multiply by width, and assign to 2
+					const p0 = b.add(left)
+					const p2 = b.add(right)
+
+					const raindropsMeshGeometry = storage(
+						this.raindropsVerticesSBA,
+						'vec3',
+						this.raindropsVerticesSBA.count);
+					
+					raindropsMeshGeometry
+						.element(instanceIndex.mul(4).add(1))
+						.assign(p1)
+
+					raindropsMeshGeometry
+						.element(instanceIndex.mul(4).add(3))
+						.assign(p3)
+
+					raindropsMeshGeometry
+						.element(instanceIndex.mul(4).add(0))
+						.assign(p0)
+
+					raindropsMeshGeometry
+						.element(instanceIndex.mul(4).add(2))
+						.assign(p2)
+					// 4 vertices per vertex index
+				})().compute(this.raindropN.value)
+
+				this.raindropsMeshVertexNode = Fn(() => {
+					return positionGeometry.mul(cameraProjectionMatrix)
+				})()
+
+				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
 			}
 		}
 		// ======================================================
@@ -493,6 +571,8 @@
 					this.camera.position.z + this.playerVelocity.z
 				)
 			}
+			// update the raindropsMeshGeometry
+			await this.renderer.computeAsync(this.raindropsComputeMeshGeometry)
 		}
 
 		// ======================================================
