@@ -32,6 +32,7 @@
 		ivec2,
 		length,
 		Loop,
+		mat4,
 		modelViewMatrix,
 		modelViewPosition,
 		modelWorldMatrix,
@@ -127,6 +128,7 @@
 		debugRaindropsMaterial: THREE.SpriteNodeMaterial
 		debugRaindropRadius: any
 		debugRaindrops: THREE.Sprite<THREE.Object3DEventMap>
+		cameraViewMatrix: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Matrix4>>
 
 		constructor() {
 			// ======================================================
@@ -153,6 +155,8 @@
 			this.camera.position.z = 1.8
 			this.camera.up = new THREE.Vector3(0, 0, 1)
 			this.camera.lookAt(0, 1, 1.8)
+			// update camera
+			this.cameraViewMatrix = uniform(this.camera.matrixWorldInverse)
 			// ======================================================
 			// =                                                    =
 			// =                  CREATE RENDERER                   =
@@ -180,6 +184,7 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
+
 			// region scene
 			this.scene = new THREE.Scene()
 			this.scene.background = new THREE.Color(0x000000)
@@ -260,7 +265,7 @@
 
 			this.raindropWidthAverage = uniform(0.01)
 			this.raindropWidthVariance = uniform(0.05)
-			this.raindropAngleOfAttackAverage = uniform(15) // in degrees
+			this.raindropAngleOfAttackAverage = uniform(45) // in degrees
 			this.raindropAngleOfAttackVariance = uniform(5)
 			// the length might have to be modified with time as well but we'll see
 			this.raindropLengthAverage = uniform(0.1) // in m
@@ -422,10 +427,14 @@
 				this.raindropsComputeMeshGeometry = Fn(() => {
 					const raindrop = this.raindrops.element(instanceIndex)
 
-					const a = raindrop.get('position')
+					const a = vec4(raindrop.get('position'), 1).mul(
+						mat4(1, 0, 0, 0, 
+							 0, 1, 0, 0,
+							 0, 0, 1, 0,
+							 0, 0, 0, 1))
 
-					const cameraSpacePos = a.mul(cameraViewMatrix)
-
+					// const cameraSpacePos = a.mul(cameraViewMatrix)
+// 
 					// construct a 2d vector of length pointing to +x
 					const length = raindrop.get('length')
 					const width = raindrop.get('width')
@@ -643,6 +652,8 @@
 					this.camera.position.z + this.playerVelocity.z
 				)
 			}
+			this.cameraViewMatrix.value = this.camera.matrixWorldInverse
+
 			// update the raindropsMeshGeometry
 			await this.renderer.computeAsync(this.raindropsComputeMeshGeometry)
 
