@@ -19,6 +19,7 @@
 		bool,
 		cameraPosition,
 		cameraProjectionMatrix,
+		cameraProjectionMatrixInverse,
 		cameraViewMatrix,
 		color,
 		cos,
@@ -129,6 +130,10 @@
 		debugRaindropRadius: any
 		debugRaindrops: THREE.Sprite<THREE.Object3DEventMap>
 		cameraViewMatrix: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Matrix4>>
+		debugRaindrops2Material: THREE.SpriteNodeMaterial
+		debugRaindrop2Radius: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		debugRaindrops2: THREE.Sprite<THREE.Object3DEventMap>
+		cameraProjectionMatrix: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Matrix4>>
 
 		constructor() {
 			// ======================================================
@@ -156,7 +161,10 @@
 			this.camera.up = new THREE.Vector3(0, 0, 1)
 			this.camera.lookAt(0, 1, 1.8)
 			// update camera
+			// region camera
 			this.cameraViewMatrix = uniform(this.camera.matrixWorldInverse)
+			this.cameraProjectionMatrix = uniform(this.camera.projectionMatrix)
+
 			// ======================================================
 			// =                                                    =
 			// =                  CREATE RENDERER                   =
@@ -320,7 +328,7 @@
 			// ======================================================
 			// holds the geometry for the raindrop
 			{
-				this.raindropsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropN.value * 4, 3)
+				this.raindropsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropN.value * 4, 4)
 				// initialize mesh indices
 				const raindropsMeshIndices = new Uint32Array(this.raindropN.value * 6)
 				// going to do it on cpu for now, could optimize this later
@@ -342,6 +350,7 @@
 				this.raindropsMeshMaterial.color = new THREE.Color(1, 1, 1)
 
 				this.raindropsMesh = new THREE.Mesh(this.raindropsMeshGeometry, this.raindropsMeshMaterial)
+				this.raindropsMesh.frustumCulled = false
 
 				this.scene.add(this.raindropsMesh)
 
@@ -427,21 +436,19 @@
 				this.raindropsComputeMeshGeometry = Fn(() => {
 					const raindrop = this.raindrops.element(instanceIndex)
 
-					const a = vec4(raindrop.get('position'), 1).mul(
-						mat4(1, 0, 0, 0, 
-							 0, 1, 0, 0,
-							 0, 0, 1, 0,
-							 0, 0, 0, 1))
+					const posCamSpace = vec4(raindrop.get('position').xyz, 1).mul(this.cameraViewMatrix)
+
+					const a = posCamSpace.xy
 
 					// const cameraSpacePos = a.mul(cameraViewMatrix)
-// 
 					// construct a 2d vector of length pointing to +x
 					const length = raindrop.get('length')
 					const width = raindrop.get('width')
-					const vToTail = vec2(1, 0).mul(length)
+					const vToTail = vec2(0, 1).mul(length)
 					// rotate the 2d vector by the angle of attack
-					const alpha = raindrop.get('angleOfAttack')
-					const vToTailPrime = rotate(vToTail, alpha)
+					// const alpha = raindrop.get('angleOfAttack')
+					// const vToTailPrime = rotate(vToTail, alpha)
+					const vToTailPrime = vToTail
 					const b = a.add(vToTailPrime)
 
 					//     | <- b
@@ -473,30 +480,31 @@
 
 					const raindropsMeshGeometry = storage(
 						this.raindropsVerticesSBA,
-						'vec3',
+						'vec4',
 						this.raindropsVerticesSBA.count);
 					
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(1))
-						.assign(p1)
+						.assign(vec4(p1.x, p1.y, posCamSpace.z, posCamSpace.w))
 
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(3))
-						.assign(p3)
+						.assign(vec4(p3.x, p3.y, posCamSpace.z, posCamSpace.w))
 
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(0))
-						.assign(p0)
+						.assign(vec4(p0.x, p0.y, posCamSpace.z, posCamSpace.w))
 
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(2))
-						.assign(p2)
+						.assign(vec4(p2.x, p2.y, posCamSpace.z, posCamSpace.w))
 					// 4 vertices per vertex index
 				})().compute(this.raindropN.value)
 
+				// region raindrops vertex
 				this.raindropsMeshVertexNode = Fn(() => {
-					// return vec4(positionGeometry, 1).mul(cameraProjectionMatrix)
-					return vec4(positionGeometry, 1)
+					return vec4(positionGeometry, 1).mul(cameraProjectionMatrix)
+					// return vec4(positionGeometry, 1)
 				})()
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
@@ -506,12 +514,19 @@
 					this.debugRaindropsMaterial = new THREE.SpriteNodeMaterial()
 					this.debugRaindropsMaterial.colorNode = color(0, 0, 0.7)
 					this.debugRaindropsMaterial.positionNode = Fn(() => {
-
-						const raindropsMeshGeometry = storage(
-						this.raindropsVerticesSBA,
-						'vec3',
-						this.raindropsVerticesSBA.count)
-						return raindropsMeshGeometry.element(instanceIndex)
+						// const raindropsMeshGeometry = storage(
+						// this.raindropsVerticesSBA,
+						// 'vec3',
+						// this.raindropsVerticesSBA.count)
+						// return raindropsMeshGeometry.element(instanceIndex)
+						// const raindropsMeshGeometry = 
+						// storage(
+						// this.raindropsVerticesSBA,
+						// 'vec3',
+						// this.raindropsVerticesSBA.count)
+						// raindropsMeshGeometry.element(instanceIndex)
+						
+						return this.raindrops.element(instanceIndex).get('position')
 						// const a = new Float32Array(6)
 						// a[0] = 0
 						// a[1] = 0
@@ -528,10 +543,46 @@
 					this.debugRaindropsMaterial.opacityNode = shapeCircle()
 
 					this.debugRaindrops = new THREE.Sprite(this.debugRaindropsMaterial)
-					this.debugRaindrops.frustumCulled = false;
+					this.debugRaindrops.frustumCulled = false
 					this.debugRaindrops.count = this.raindropN.value
 					// this.debugRaindrops.count = 2
 					this.scene.add(this.debugRaindrops)
+				}
+				// region debug spheres 2
+				{
+					this.debugRaindrops2Material = new THREE.SpriteNodeMaterial()
+					this.debugRaindrops2Material.colorNode = color(0, 0, 0.7)
+					this.debugRaindrops2Material.positionNode = Fn(() => {
+						const raindropsMeshGeometry = storage(
+						this.raindropsVerticesSBA,
+						'vec4',
+						this.raindropsVerticesSBA.count)
+						return vec3(
+							raindropsMeshGeometry.element(instanceIndex).x,
+							0,
+							raindropsMeshGeometry.element(instanceIndex).y
+						)
+
+						// const a = new Float32Array(6)
+						// a[0] = 0
+						// a[1] = 0
+						// a[2] = 0
+						// a[3] = .2
+						// a[4] = 0
+						// a[5] = 0
+						// return instancedArray(a, 'vec3').toAttribute()
+					})()
+					// this.raindropsVerticesSBA
+					this.debugRaindrop2Radius = uniform(0.01)
+					this.debugRaindrops2Material.scaleNode = this.debugRaindropRadius
+					// TODO I have no idea what this opacityNode does lol
+					this.debugRaindrops2Material.opacityNode = shapeCircle()
+
+					this.debugRaindrops2 = new THREE.Sprite(this.debugRaindrops2Material)
+					this.debugRaindrops2.frustumCulled = false
+					this.debugRaindrops2.count = this.raindropN.value
+					// this.debugRaindrops.count = 2
+					this.scene.add(this.debugRaindrops2)
 				}
 			}
 			// region gpu
@@ -653,7 +704,7 @@
 				)
 			}
 			this.cameraViewMatrix.value = this.camera.matrixWorldInverse
-
+			this.cameraProjectionMatrix.value = this.camera.projectionMatrix
 			// update the raindropsMeshGeometry
 			await this.renderer.computeAsync(this.raindropsComputeMeshGeometry)
 
