@@ -108,11 +108,16 @@
 		raindrops: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
 		wavelets: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
 		raindropEnabledN: THREE.TSL.ShaderNodeObject<THREE.UniformNode<any>>
-		rainDropN: any
-		raindropsMeshGeometry: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
-		raindropsMeshIndices: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
-		raindropsMesh: THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap>
-		randropsMeshGeometry: any
+		raindropsVerticesSBA: THREE.StorageBufferAttribute
+		raindropsMeshGeometry: THREE.BufferGeometry<
+			THREE.NormalBufferAttributes,
+			THREE.BufferGeometryEventMap
+		>
+		raindropsMeshMaterial: THREE.MeshBasicMaterial
+		raindropsMesh: THREE.Mesh
+		planeW: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		planeH: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		initRaindrops: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 
 		constructor() {
 			// ======================================================
@@ -172,7 +177,14 @@
 			{
 				this.planeNVX = uniform(50)
 				this.planeNVY = uniform(50)
-				const geometry = new THREE.PlaneGeometry(1, 1, this.planeNVX.value, this.planeNVY.value)
+				this.planeW = uniform(1)
+				this.planeH = uniform(1)
+				const geometry = new THREE.PlaneGeometry(
+					this.planeW.value,
+					this.planeH.value,
+					this.planeNVX.value,
+					this.planeNVY.value
+				)
 				const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
 				material.color = new THREE.Color(0.3, 0, 0)
 				const mesh = new THREE.Mesh(geometry, material)
@@ -230,7 +242,7 @@
 			// =                                                    =
 			// ======================================================
 			this.raindropN = uniform(50)
-			this.raindropEnabledN = uniform(this.rainDropN.value)
+			this.raindropEnabledN = uniform(this.raindropN.value)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
 			this.raindropSpawnHeightAverage = uniform(6) // low for debugging purposes
@@ -285,7 +297,7 @@
 			this.wavelets = instancedArray(this.raindropN.value, this.waveletStruct)
 			// holds the geometry for the raindrop
 			{
-				this.raindropsMeshGeometry = instancedArray(this.raindropN.value * 4, 'vec3')
+				this.raindropsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropN.value * 4, 3)
 				// initialize mesh indices
 				const raindropsMeshIndices = new Uint32Array(this.raindropN.value * 6)
 				// going to do it on cpu for now, could optimize this later
@@ -298,15 +310,79 @@
 					raindropsMeshIndices[i * 6 + 4] = i * 4 + 2
 					raindropsMeshIndices[i * 6 + 5] = i * 4 + 3
 				}
-				this.raindropsMeshIndices = instancedArray(raindropsMeshIndices, 'uint')
+				const raindropsMeshIndicesSBA = new THREE.StorageBufferAttribute(raindropsMeshIndices, 1)
 
-				this.raindropsMesh = new THREE.BufferGeometry()
+				this.raindropsMeshGeometry = new THREE.BufferGeometry()
+				this.raindropsMeshGeometry.setAttribute('position', this.raindropsVerticesSBA)
+				this.raindropsMeshGeometry.setIndex(raindropsMeshIndicesSBA)
+				this.raindropsMeshMaterial = new THREE.MeshBasicMaterial()
+				this.raindropsMeshMaterial.color = new THREE.Color(1, 1, 1)
 
-					this.randropsMeshGeometry,
-					this.raindropsMeshIndices
+				this.raindropsMesh = new THREE.Mesh(this.raindropsMeshGeometry, this.raindropsMeshMaterial)
+
+				this.scene.add(this.raindropsMesh)
+
+				const n1P1 = (seed: THREE.TSL.ShaderNodeObject<THREE.Node>) => {
+					// converts [0, 1] to [-1, 1]
+					return hash(seed).mul(2).sub(1)
+				}
+
 				// inside each raindrop's compute cell:
 				//   update the 4 vertices associated with the raindrop
-				//     specifically, this.raindropVertices
+				//     specifically, this.raindropsVertices
+				this.initRaindrops = Fn(() => {
+					// by default, allocate ~20 random seeds for each and every
+					// raindrop
+					// after the initializer, time will act as a seed
+
+					const baseSeedIndex = instanceIndex.mul(20)
+
+					// determine position
+					//   determine spawn height
+					const z = this.raindropSpawnHeightAverage
+					    .add(
+						    n1P1(baseSeedIndex)
+							.mul(this.raindropSpawnHeightVariance))
+
+					//   determine x y position
+					const x = this.planeW.mul(
+						n1P1(baseSeedIndex.add(1)).div(2))
+					const y = this.planeH.mul(
+						n1P1(baseSeedIndex.add(2)).div(2))
+					// determine angle of attack
+					const theta = this.raindropAngleOfAttackAverage.add(
+						this.raindropAngleOfAttackVariance.mul(
+							n1P1(baseSeedIndex.add(3)).div(2))
+					)
+					// determine width
+					const width = this.raindropWidthAverage.add(
+						this.raindropWidthVariance.mul(
+							n1P1(baseSeedIndex.add(4)).div(2))
+					)
+					// determine length
+					const length = this.raindropLengthAverage.add(
+						this.raindropLengthVariance.mul(
+							n1P1(baseSeedIndex.add(5)).div(2))
+					)
+					// determine mass
+					const mass = this.raindropMassAverage.add(
+						this.raindropMassVariance.mul(
+							n1P1(baseSeedIndex.add(6)).div(2))
+					)
+
+					const raindrop = this.raindrops.element(instanceIndex)
+					raindrop.get('position')
+						.assign(vec3(x, y, z))
+					raindrop.get('velocity')
+						.assign(0)
+					raindrop.get('width')
+						.assign(width)
+					raindrop.get('length')
+						.assign(length)
+					raindrop.get('angleOfAttack')
+					
+					
+				})().compute(this.raindropN.value)
 			}
 		}
 		// ======================================================
@@ -442,6 +518,8 @@
 		// =                                                    =
 		// ======================================================
 		init = async () => {
+			await this.renderer.computeAsync(this.initRaindrops)
+
 			// region init
 			await this.renderer.setAnimationLoop(this.gameLoop)
 		}
