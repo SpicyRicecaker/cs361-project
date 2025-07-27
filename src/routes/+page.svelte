@@ -108,7 +108,7 @@
 		waveletMinOpacityVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletOpacityOverTimeAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletOpacityOverTimeVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropN: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropsN: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindrops: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
 		wavelets: THREE.TSL.ShaderNodeObject<THREE.StorageBufferNode>
 		raindropEnabledN: THREE.TSL.ShaderNodeObject<THREE.UniformNode<any>>
@@ -121,7 +121,7 @@
 		raindropsMesh: THREE.Mesh
 		planeW: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		planeH: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		initRaindrops: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
+		raindropsInit: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 		raindropsComputeMeshGeometry: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 		raindropsMeshVertexNode: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
 		rawGPUSushiPlate: Float32Array<ArrayBuffer>
@@ -134,6 +134,17 @@
 		debugRaindrop2Radius: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		debugRaindrops2: THREE.Sprite<THREE.Object3DEventMap>
 		cameraProjectionMatrix: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Matrix4>>
+		raindropsGenerateFromCloud: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
+		raindropsComputeFromCloud: any
+		raindropsComputePhysics: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
+		lastTimeStamp: number | null
+		dtS: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropVelocityAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropVelocityVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropVelocityHorizontalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropVelocityHorizontalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropVelocityVerticalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropVelocityVerticalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 
 		constructor() {
 			// ======================================================
@@ -255,7 +266,7 @@
 				this.playerForward = new THREE.Vector3(0, 1, 0)
 				this.playerRight = new THREE.Vector3(1, 0, 0)
 				this.playerUp = new THREE.Vector3(0, 0, 1)
-				this.playerPitch = 0
+				this.playerPitch = 70
 				this.playerYaw = 0
 			}
 			// ======================================================
@@ -264,8 +275,8 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.raindropN = uniform(50)
-			this.raindropEnabledN = uniform(this.raindropN.value)
+			this.raindropsN = uniform(50)
+			this.raindropEnabledN = uniform(this.raindropsN.value)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
 			this.raindropSpawnHeightAverage = uniform(6) // low for debugging purposes
@@ -276,6 +287,11 @@
 			this.raindropAngleOfAttackAverage = uniform(45) // in degrees
 			this.raindropAngleOfAttackVariance = uniform(1)
 			// the length might have to be modified with time as well but we'll see
+			this.raindropVelocityHorizontalAverage = uniform(0.1)
+			this.raindropVelocityHorizontalVariance = uniform(0.05)
+			this.raindropVelocityVerticalAverage = uniform(1)
+			this.raindropVelocityVerticalVariance = uniform(0.05)
+
 			this.raindropLengthAverage = uniform(0.1) // in m
 			this.raindropLengthVariance = uniform(0.01)
 			this.raindropMassAverage = uniform(0.001) // in kg
@@ -316,8 +332,8 @@
 				opacityGrowthRate: 'float'
 			})
 
-			this.raindrops = instancedArray(this.raindropN.value, this.raindropStruct)
-			this.wavelets = instancedArray(this.raindropN.value, this.waveletStruct)
+			this.raindrops = instancedArray(this.raindropsN.value, this.raindropStruct)
+			this.wavelets = instancedArray(this.raindropsN.value, this.waveletStruct)
 
 
 			// ======================================================
@@ -328,11 +344,11 @@
 			// ======================================================
 			// holds the geometry for the raindrop
 			{
-				this.raindropsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropN.value * 4, 4)
+				this.raindropsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropsN.value * 4, 4)
 				// initialize mesh indices
-				const raindropsMeshIndices = new Uint32Array(this.raindropN.value * 6)
+				const raindropsMeshIndices = new Uint32Array(this.raindropsN.value * 6)
 				// going to do it on cpu for now, could optimize this later
-				for (let i = 0; i < this.raindropN.value; i++) {
+				for (let i = 0; i < this.raindropsN.value; i++) {
 					// HOMETOWNMD 1
 					raindropsMeshIndices[i * 6] = i * 4
 					raindropsMeshIndices[i * 6 + 1] = i * 4 + 1
@@ -370,7 +386,7 @@
 				// =                                                    =
 				// ======================================================
 				// region init raindrops 
-				this.initRaindrops = Fn(() => {
+				this.raindropsGenerateFromCloud = Fn(({t = time}) => {
 					// by default, allocate ~20 random seeds for each and every
 					// raindrop
 					// after the initializer, time will act as a seed
@@ -392,29 +408,43 @@
 					// determine angle of attack
 					const alpha = this.raindropAngleOfAttackAverage.add(
 						this.raindropAngleOfAttackVariance.mul(
-							n1P1(baseSeedIndex.add(3)).div(2))
+							n1P1(baseSeedIndex.add(3)))
 					)
 					// determine width
 					const width = this.raindropWidthAverage.add(
 						this.raindropWidthVariance.mul(
-							n1P1(baseSeedIndex.add(4)).div(2))
+							n1P1(baseSeedIndex.add(4)))
 					)
 					// determine length
 					const length = this.raindropLengthAverage.add(
 						this.raindropLengthVariance.mul(
-							n1P1(baseSeedIndex.add(5)).div(2))
+							n1P1(baseSeedIndex.add(5)))
 					)
 					// determine mass
 					const mass = this.raindropMassAverage.add(
 						this.raindropMassVariance.mul(
-							n1P1(baseSeedIndex.add(6)).div(2))
+							n1P1(baseSeedIndex.add(6)))
 					)
+
+					// determine horizontal velocity
+					const velocityHorizontal = this.raindropVelocityHorizontalAverage.add(
+						this.raindropVelocityHorizontalVariance.mul(
+							n1P1(baseSeedIndex.add(7))
+						)
+					)
+
+					// determine vertical
+					const velocityVertical = this.raindropVelocityVerticalAverage.add(
+						this.raindropVelocityVerticalVariance.mul(
+							n1P1(baseSeedIndex.add(8))
+						)
+					).negate()
 
 					const raindrop = this.raindrops.element(instanceIndex)
 					raindrop.get('position')
 						.assign(vec3(x, y, z))
 					raindrop.get('velocity')
-						.assign(0)
+						.assign(vec3(velocityHorizontal, velocityHorizontal, velocityVertical))
 					raindrop.get('width')
 						.assign(width)
 					raindrop.get('length')
@@ -423,7 +453,9 @@
 						.assign(alpha)
 					raindrop.get('mass')
 						.assign(mass)
-				})().compute(this.raindropN.value)
+				})()
+
+				this.raindropsInit = this.raindropsGenerateFromCloud.compute(this.raindropsN.value)
 
 				// ======================================================
 				// =                                                    =
@@ -517,7 +549,7 @@
 						.element(instanceIndex.mul(4).add(2))
 						.assign(vec4(p2.x, p2.y, posCamSpace.z, posCamSpace.w))
 					// 4 vertices per vertex index
-				})().compute(this.raindropN.value)
+				})().compute(this.raindropsN.value)
 
 				// region raindrops vertex
 				this.raindropsMeshVertexNode = Fn(() => {
@@ -530,6 +562,29 @@
 				})()
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
+
+
+				this.dtS = uniform(0)
+				// region rain physics
+				this.raindropsComputePhysics = Fn(() => {
+					const raindrop = this.raindrops.element(instanceIndex)
+					const position = raindrop.get('position')
+					const velocity = raindrop.get('velocity')
+					const alpha = raindrop.get('angleOfAttack')
+					// proportional to cos angle of attack
+					const rainVelocityX = cos(radians(alpha)).mul(velocity.x)
+
+					const rainVelocityZ = sin(radians(alpha)).mul(velocity.z)
+					// set to 0 for now, could change later
+					const rainVelocityY = 0
+
+					const changeInPos = vec3(
+						rainVelocityX, 
+						rainVelocityY, 
+						rainVelocityZ).mul(this.dtS)
+
+					position.addAssign(changeInPos)
+				})().compute(this.raindropsN.value)
 
 				// region debug spheres
 				// {
@@ -685,6 +740,7 @@
 					Object.entries(this.inputEventToListenerList).forEach(([v, k]) =>
 						(window as any).removeEventListener(v, k)
 					)
+					this.renderer.setAnimationLoop(() => {})
 				})
 			}
 		}
@@ -702,7 +758,10 @@
 		// =                                                    =
 		// ======================================================
 		// region tick
-		tick = async () => {
+		tick = async (dtMs: number) => {
+			// update uniform
+			this.dtS.value = dtMs / 1000
+
 			// update player
 			{
 				// ================== [ COMPUTE CAM VECTORS ] ==================
@@ -725,6 +784,9 @@
 					this.camera.position.z + this.playerVelocity.z
 				)
 			}
+			// update physics
+			await this.renderer.computeAsync(this.raindropsComputePhysics)
+			// update camera projections
 			this.cameraViewMatrix.value = this.camera.matrixWorldInverse
 			this.cameraProjectionMatrix.value = this.camera.projectionMatrix
 			// update the raindropsMeshGeometry
@@ -753,8 +815,13 @@
 			await this.renderer.render(this.scene, this.camera)
 		}
 
-		gameLoop = async () => {
-			await this.tick()
+		gameLoop = async (time: DOMHighResTimeStamp) => {
+			if (!this.lastTimeStamp) {
+				this.lastTimeStamp = time
+			}
+			const dtMs = time - this.lastTimeStamp
+			this.lastTimeStamp = time
+			await this.tick(dtMs)
 			await this.render()
 		}
 
@@ -765,7 +832,7 @@
 		// =                                                    =
 		// ======================================================
 		init = async () => {
-			await this.renderer.computeAsync(this.initRaindrops)
+			await this.renderer.computeAsync(this.raindropsInit)
 
 			await this.renderer.computeAsync(this.initGPUSushiPlate)
 
