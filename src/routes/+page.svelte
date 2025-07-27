@@ -148,7 +148,7 @@
 				70,
 				window.innerWidth / window.innerHeight,
 				0.00001,
-				100
+				1000
 			)
 			this.camera.position.z = 1.8
 			this.camera.up = new THREE.Vector3(0, 0, 1)
@@ -486,7 +486,8 @@
 				})().compute(this.raindropN.value)
 
 				this.raindropsMeshVertexNode = Fn(() => {
-					return positionGeometry.mul(cameraProjectionMatrix)
+					// return vec4(positionGeometry, 1).mul(cameraProjectionMatrix)
+					return vec4(positionGeometry, 1)
 				})()
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
@@ -495,15 +496,21 @@
 				{
 					this.debugRaindropsMaterial = new THREE.SpriteNodeMaterial()
 					this.debugRaindropsMaterial.colorNode = color(0, 0, 0.7)
-					this.debugRaindropsMaterial.positionNode = (() => {
-						const a = new Float32Array(6)
-						a[0] = 0
-						a[1] = 0
-						a[2] = 0
-						a[3] = .2
-						a[4] = 0
-						a[5] = 0
-						return instancedArray(a, 'vec3').toAttribute()
+					this.debugRaindropsMaterial.positionNode = Fn(() => {
+
+						const raindropsMeshGeometry = storage(
+						this.raindropsVerticesSBA,
+						'vec3',
+						this.raindropsVerticesSBA.count)
+						return raindropsMeshGeometry.element(instanceIndex)
+						// const a = new Float32Array(6)
+						// a[0] = 0
+						// a[1] = 0
+						// a[2] = 0
+						// a[3] = .2
+						// a[4] = 0
+						// a[5] = 0
+						// return instancedArray(a, 'vec3').toAttribute()
 					})()
 					// this.raindropsVerticesSBA
 					this.debugRaindropRadius = uniform(0.01)
@@ -512,8 +519,9 @@
 					this.debugRaindropsMaterial.opacityNode = shapeCircle()
 
 					this.debugRaindrops = new THREE.Sprite(this.debugRaindropsMaterial)
-					// this.debugRaindrops.count = this.raindropN.value
-					this.debugRaindrops.count = 2
+					this.debugRaindrops.frustumCulled = false;
+					this.debugRaindrops.count = this.raindropN.value
+					// this.debugRaindrops.count = 2
 					this.scene.add(this.debugRaindrops)
 				}
 			}
