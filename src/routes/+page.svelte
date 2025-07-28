@@ -290,7 +290,7 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.raindropsDebugNSqrt = uniform(2)
+			this.raindropsDebugNSqrt = uniform(4)
 			this.raindropsN = uniform(this.raindropsDebugNSqrt.value * this.raindropsDebugNSqrt.value)
 			this.raindropEnabledN = uniform(this.raindropsN.value)
 			this.raindropConstHeightGround = uniform(0.0)
@@ -351,8 +351,9 @@
 				exists: 'uint'
 			})
 
-			this.raindrops = instancedArray(this.raindropsN.value, this.raindropStruct)
-			this.wavelets = instancedArray(this.raindropsN.value, this.waveletStruct)
+			this.raindrops = instancedArray(this.raindropsN.value * 2, this.raindropStruct)
+			const waveletStructBuffer = new Uint32Array(this.raindropsN.value * 11)
+			this.wavelets = instancedArray(waveletStructBuffer, this.waveletStruct)
 
 			// ======================================================
 			// =                                                    =
@@ -909,24 +910,24 @@
 
 						const waveletsMeshGeometry = storage(
 							this.waveletsVerticesSBA,
-							'vec3',
+							'vec4',
 							this.waveletsVerticesSBA.count);
 
 						waveletsMeshGeometry
 							.element(instanceIndex.mul(4).add(0))
-							.assign(p0)
+							.assign(vec4(p0, 1))
 
 						waveletsMeshGeometry
 							.element(instanceIndex.mul(4).add(1))
-							.assign(p1)
+							.assign(vec4(p1, 1))
 
 						waveletsMeshGeometry
 							.element(instanceIndex.mul(4).add(2))
-							.assign(p2)
+							.assign(vec4(p2, 1))
 
 						waveletsMeshGeometry
 							.element(instanceIndex.mul(4).add(3))
-							.assign(p3)
+							.assign(vec4(p3, 1))
 					}
 				}
 
@@ -945,7 +946,7 @@
 					positionInterpolators.assign(positionGeometry.xyz)
 					// get attribute
 					waveletIDInterpolators.assign(attribute('waveletID'))
-					return vec4(positionGeometry, 1)
+					return positionGeometry
 							.mul(cameraViewMatrix.transpose())
 							.mul(cameraProjectionMatrix.transpose())
 				})()
@@ -962,7 +963,12 @@
 				this.waveletsMeshMaterial.fragmentNode = Fn(() => {
 					// calculate the distance from the center of the node
 					const wavelet = this.wavelets.element(waveletIDInterpolators)
-					wavelet.get('exists').equal(0).discard()
+					// wavelet.get('exists').equal(0).discard()
+					// wavelet.get('lifetime').equal(0).discard()
+					wavelet.get('maxRadius').equal(0).discard()
+					// wavelet.get('maxLifeTime').equal(0).discard()
+					// wavelet.get('opacity').equal(0).discard()
+					// wavelet.get('opacityGrowthRate').equal(0).discard()
 
 					const distance = wavelet.get('position').negate().add(positionInterpolators)
 									  .length()
