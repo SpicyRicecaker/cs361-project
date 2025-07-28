@@ -177,7 +177,7 @@
 				70,
 				window.innerWidth / window.innerHeight,
 				0.00001,
-				1000
+				15.
 			)
 			this.camera.position.z = 0.5
 			this.camera.up = new THREE.Vector3(0, 0, 1)
@@ -222,8 +222,8 @@
 			{
 				this.planeNVX = uniform(50)
 				this.planeNVY = uniform(50)
-				this.planeW = uniform(1.)
-				this.planeH = uniform(1.)
+				this.planeW = uniform(15.)
+				this.planeH = uniform(15.)
 				const geometry = new THREE.PlaneGeometry(
 					this.planeW.value,
 					this.planeH.value,
@@ -231,16 +231,16 @@
 					this.planeNVY.value
 				)
 				const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
-				material.color = new THREE.Color(0.01, 0.01, 0.01)
-				material.transparent = true
-				material.opacity = 0.6
+				material.color = new THREE.Color(0, 0, 0)
+				// material.transparent = true
+				// material.opacity = 0.6
 				const mesh = new THREE.Mesh(geometry, material)
 				this.scene.add(mesh)
 			}
 			// add debug axis
 			{
-				const axesHelper = new THREE.AxesHelper(5)
-				this.scene.add(axesHelper)
+				// const axesHelper = new THREE.AxesHelper(5)
+				// this.scene.add(axesHelper)
 			}
 			// init input
 			{
@@ -290,13 +290,13 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.raindropsDebugNSqrt = uniform(4)
+			this.raindropsDebugNSqrt = uniform(120)
 			this.raindropsN = uniform(this.raindropsDebugNSqrt.value * this.raindropsDebugNSqrt.value)
 			this.raindropEnabledN = uniform(this.raindropsN.value)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
-			this.raindropSpawnHeightAverage = uniform(1) // low for debugging purposes
-			this.raindropSpawnHeightVariance = uniform(3)
+			this.raindropSpawnHeightAverage = uniform(5) // low for debugging purposes
+			this.raindropSpawnHeightVariance = uniform(2)
 			this.raindropColor = uniform(new THREE.Color(0, 0, 1))
 
 			this.raindropWidthAverage = uniform(0.001)
@@ -306,12 +306,12 @@
 			this.raindropYawAverage = uniform(180) // in degrees
 			this.raindropYawVariance = uniform(2)
 			// the length might have to be modified with time as well but we'll see
-			this.raindropSpeedHorizontalAverage = uniform(0.1)
-			this.raindropSpeedHorizontalVariance = uniform(0.05)
-			this.raindropSpeedVerticalAverage = uniform(0.3)
+			this.raindropSpeedHorizontalAverage = uniform(0.2)
+			this.raindropSpeedHorizontalVariance = uniform(0.2)
+			this.raindropSpeedVerticalAverage = uniform(1.5)
 			this.raindropSpeedVerticalVariance = uniform(0.05)
 
-			this.raindropLengthAverage = uniform(0.3) // in m
+			this.raindropLengthAverage = uniform(0.5) // in m
 			this.raindropLengthVariance = uniform(0.1)
 			this.raindropMassAverage = uniform(0.001) // in kg
 			this.raindropMassVariance = uniform(0.0001)
@@ -322,10 +322,10 @@
 			// this.waveletInnerRadiusOverTimeVariance = uniform(0.001) // can be a function of time, but this is currently not easily modifiable via the gui so will have to keep as const for now
 			// this.waveletOuterRadiusOverTimeAverage = uniform(0.02) // can be a function of time
 			// this.waveletOuterRadiusOverTimeVariance = uniform(0.001)
-			this.waveletMaxRadiusAverage = uniform(0.03)
-			this.waveletMaxRadiusVariance = uniform(0.005)
-			this.waveletMaxLifetimeAverage = uniform(1) // in seconds
-			this.waveletMaxLifetimeVariance = uniform(0.5)
+			this.waveletMaxRadiusAverage = uniform(0.06)
+			this.waveletMaxRadiusVariance = uniform(0.05)
+			this.waveletMaxLifetimeAverage = uniform(0.6) // in seconds
+			this.waveletMaxLifetimeVariance = uniform(0.2)
 
 			this.waveletMinOpacityAverage = uniform(0.3)
 			this.waveletMinOpacityVariance = uniform(0.1)
@@ -420,40 +420,40 @@
 					//   determine spawn height
 					const z = this.raindropSpawnHeightAverage
 					    .add(
-						    // this.n1P1(baseSeedIndex)
-							// .mul(this.raindropSpawnHeightVariance)
-							0
+						    this.n1P1(baseSeedIndex)
+							.mul(this.raindropSpawnHeightVariance)
+							// 0
 						)
 
 					// -----------debug---------------
-					// const x = float(0.5).negate()
-					// const y = float(0.5)
-					// calculate iX
-					const iY = instanceIndex.div(this.raindropsDebugNSqrt)
-					// calcualte iY
-					const iX = instanceIndex.sub(iY.mul(this.raindropsDebugNSqrt))
-					const dX = this.planeW.div(this.raindropsDebugNSqrt)
-					const dY = this.planeH.div(this.raindropsDebugNSqrt).negate()
-					const offsetX = dX.div(2.)
-					const offsetY = dY.div(2.)
-					const cornerX = float(0.).sub(this.planeW.div(2.))
-					const cornerY = float(0.).sub(this.planeH.div(2.))
+					// // const x = float(0.5).negate()
+					// // const y = float(0.5)
+					// // calculate iX
+					// const iY = instanceIndex.div(this.raindropsDebugNSqrt)
+					// // calcualte iY
+					// const iX = instanceIndex.sub(iY.mul(this.raindropsDebugNSqrt))
+					// const dX = this.planeW.div(this.raindropsDebugNSqrt)
+					// const dY = this.planeH.div(this.raindropsDebugNSqrt).negate()
+					// const offsetX = dX.div(2.)
+					// const offsetY = dY.div(2.)
+					// const cornerX = float(0.).sub(this.planeW.div(2.))
+					// const cornerY = float(0.).sub(this.planeH.div(2.))
 
-					// const x = float(iX).mul(dX).add(offsetX).sub(cornerX)
-					// const y = float(iY).mul(dY).add(offsetY).add(cornerY)
+					// // const x = float(iX).mul(dX).add(offsetX).sub(cornerX)
+					// // const y = float(iY).mul(dY).add(offsetY).add(cornerY)
 
-					const x = float(iX).mul(dX).add(offsetX).add(-0.5)
-					const y = float(iY).mul(dY).add(offsetY).add(0.5)
+					// // const x = float(iX).mul(dX).add(offsetX).add(-0.5)
+					// // const y = float(iY).mul(dY).add(offsetY).add(0.5)
 
-					// const x = instanceIndex.div(4)
-					// const y = instanceIndex.sub(x.mul(4))
+					// // const x = instanceIndex.div(4)
+					// // const y = instanceIndex.sub(x.mul(4))
 					// -----------end debug---------------
 
 					//   determine x y position
-					// const x = this.planeW.mul(
-					// 	this.n1P1(baseSeedIndex.add(1)).div(2))
-					// const y = this.planeH.mul(
-					// 	this.n1P1(baseSeedIndex.add(2)).div(2))
+					const x = this.planeW.mul(
+						this.n1P1(baseSeedIndex.add(1)).div(2))
+					const y = this.planeH.mul(
+						this.n1P1(baseSeedIndex.add(2)).div(2))
 
 					// determine width
 					const width = this.raindropWidthAverage.add(
@@ -462,47 +462,47 @@
 					)
 					// determine length
 					const length = this.raindropLengthAverage.add(
-						// this.raindropLengthVariance.mul(
-						// 	this.n1P1(baseSeedIndex.add(4)))
-						0
+						this.raindropLengthVariance.mul(
+							this.n1P1(baseSeedIndex.add(4)))
+						// 0
 					)
 					// determine mass
 					const mass = this.raindropMassAverage.add(
-						// this.raindropMassVariance.mul(
-						// 	this.n1P1(baseSeedIndex.add(5)))
-						0
+						this.raindropMassVariance.mul(
+							this.n1P1(baseSeedIndex.add(5)))
+						// 0
 					)
 
 					// determine yaw
 					const yaw = this.raindropYawAverage.add(
-						// this.raindropYawVariance.mul(
-						// 	this.n1P1(baseSeedIndex.add(6)))
-						0
+						this.raindropYawVariance.mul(
+							this.n1P1(baseSeedIndex.add(6)))
+						// 0
 					)
 
 					// determine pitch
 					const pitch = this.raindropPitchAverage.add(
-						// this.raindropPitchVariance.mul(
-						// 	this.n1P1(baseSeedIndex.add(7)))
-						0
+						this.raindropPitchVariance.mul(
+							this.n1P1(baseSeedIndex.add(7)))
+						// 0
 					)
 
 					// determine horizontal speed
-					const speedHorizontal = 0
+					// const speedHorizontal = 0
 					
-					// this.raindropSpeedHorizontalAverage.add(
-					// 	// this.raindropSpeedHorizontalVariance.mul(
-					// 	// 	this.n1P1(baseSeedIndex.add(8))
-					// 	// )
-					// 	0
-					// )
+					const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
+						this.raindropSpeedHorizontalVariance.mul(
+							this.n1P1(baseSeedIndex.add(8))
+						)
+						// 0
+					)
 
 					// determine vertical speed
 					const speedVertical = this.raindropSpeedVerticalAverage.add(
-						// this.raindropSpeedVerticalVariance.mul(
-						// 	this.n1P1(baseSeedIndex.add(9))
-						// )
-						0
+						this.raindropSpeedVerticalVariance.mul(
+							this.n1P1(baseSeedIndex.add(9))
+						)
+						// 0
 					)
 
 					// generate a velocity based off of pitch, yaw, horizontal,
@@ -636,8 +636,15 @@
 				})().compute(this.raindropsN.value)
 
 				// region raindrops vertex
+				const depthInterpolators = varying(float())
 				this.raindropsMeshVertexNode = Fn(() => {
-					return vec4(positionGeometry, 1).mul(cameraProjectionMatrix.transpose())
+					const pos = attribute('position')
+					const newPos = pos.mul(cameraProjectionMatrix.transpose())
+					depthInterpolators.assign(
+						float(1.)
+						.sub(
+							newPos.z.div(2)))
+					return newPos
 
 					// return vec4(positionGeometry, 1).mul(this.cameraViewMatrix).mul(this.cameraProjectionMatrix)
 					
@@ -646,6 +653,10 @@
 				})()
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
+				this.raindropsMeshMaterial.fragmentNode = Fn(() => {
+					return depthInterpolators.mul(color(0.7, 0.7, 0.7))
+					// return color(0.7, 0.7, 0.7)
+				})()
 
 				this.dtS = uniform(0)
 				// region rain physics
@@ -892,9 +903,10 @@
 
 						// could make these uniforms later
 						const w = 0.5
-						const dw = vec3(0.05, 0, 0)
 						const h = 0.5
-						const dh = vec3(0, 0.05, 0)
+
+						const dw = vec3(this.waveletMaxRadiusAverage.add(this.waveletMaxRadiusVariance), 0, 0)
+						const dh = vec3(0, this.waveletMaxRadiusAverage.add(this.waveletMaxRadiusVariance), 0)
 
 						const p0 = c
 									.sub(dw)
@@ -997,7 +1009,7 @@
 					// return distance.mul(color(1, 1, 1))
 					// return wavelet.get('innerRadius').mul(color(1, 1, 1))
 					// return wavelet.get('outerRadius').mul(color(1, 1, 1))
-					return color(1, 1, 1)
+					return color(1, 1, 1).mul(0.4)
 				})()
 
 				// region wavelet physics
