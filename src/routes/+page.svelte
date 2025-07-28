@@ -384,12 +384,12 @@
 				// =                                                    =
 				// ======================================================
 				// region init raindrops 
-				this.raindropsGenerateFromCloud = (i: THREE.TSL.ShaderNodeObject<THREE.Node>) => {
+				this.raindropsGenerateFromCloud = (i: THREE.TSL.ShaderNodeObject<THREE.Node>, t) => {
 					// by default, allocate ~20 random seeds for each and every
 					// raindrop
 					// after the initializer, time will act as a seed
 
-					const baseSeedIndex = i.mul(20)
+					const baseSeedIndex = i.add(t).mul(20)
 
 					// determine position
 					//   determine spawn height
@@ -422,8 +422,8 @@
 
 					// determine yaw
 					const yaw = this.raindropYawAverage.add(
-						// this.raindropYawVariance.mul(
-						// 	n1P1(baseSeedIndex.add(6)))
+						this.raindropYawVariance.mul(
+							n1P1(baseSeedIndex.add(6)))
 					)
 
 					// determine pitch
@@ -434,12 +434,11 @@
 					)
 
 					// determine horizontal speed
-					// const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
-					// 	this.raindropSpeedHorizontalVariance.mul(
-					// 		n1P1(baseSeedIndex.add(8))
-					// 	)
-					// )
-					const speedHorizontal = 0
+					const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
+						this.raindropSpeedHorizontalVariance.mul(
+							n1P1(baseSeedIndex.add(8))
+						)
+					)
 
 					// determine vertical speed
 					const speedVertical = this.raindropSpeedVerticalAverage.add(
@@ -478,7 +477,7 @@
 				}
 
 				this.raindropsInit = Fn(() => {
-					this.raindropsGenerateFromCloud(instanceIndex)
+					this.raindropsGenerateFromCloud(instanceIndex, 0)
 				})().compute(this.raindropsN.value)
 
 				// ======================================================
@@ -591,7 +590,7 @@
 
 				this.dtS = uniform(0)
 				// region rain physics
-				this.raindropsComputePhysics = Fn(() => {
+				this.raindropsComputePhysics = Fn(({t = time}) => {
 					const raindrop = this.raindrops.element(instanceIndex)
 					const position = raindrop.get('position')
 					const velocity = raindrop.get('velocity')
@@ -604,7 +603,7 @@
 					const lengthZ = velocity.normalize().mul(length).z
 					
 					If(newPos.z.lessThanEqual(this.raindropConstHeightGround.add(lengthZ)), () => {
-						this.raindropsGenerateFromCloud(instanceIndex)
+						this.raindropsGenerateFromCloud(instanceIndex, t)
 					}).Else(() => {
 						position.assign(newPos)
 					})
@@ -729,8 +728,8 @@
 			if (this.inputMouseDown) {
 				this.playerPitch = mClamp(
 					this.playerPitch - e.movementY * pitchYawConversionFactor,
-					-90,
-					90
+					-89.99,
+					89.99
 				)
 				this.playerYaw = this.playerYaw - e.movementX * pitchYawConversionFactor
 			}
