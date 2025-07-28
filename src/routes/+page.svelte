@@ -27,6 +27,7 @@
 		Discard,
 		distance,
 		float,
+		floor,
 		Fn,
 		hash,
 		If,
@@ -162,6 +163,7 @@
 		waveletMaxRadiusVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		waveletsMeshVertexNode: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
 		waveletsComputePhysics: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
+		paused: boolean
 
 		constructor() {
 			// ======================================================
@@ -219,16 +221,18 @@
 			{
 				this.planeNVX = uniform(50)
 				this.planeNVY = uniform(50)
-				this.planeW = uniform(5)
-				this.planeH = uniform(5)
+				this.planeW = uniform(1)
+				this.planeH = uniform(1)
 				const geometry = new THREE.PlaneGeometry(
-					this.planeW.value,
-					this.planeH.value,
+					this.planeW.value * 5,
+					this.planeH.value * 5,
 					this.planeNVX.value,
 					this.planeNVY.value
 				)
 				const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
 				material.color = new THREE.Color(0.01, 0.01, 0.01)
+				material.transparent = true
+				material.opacity = 0.6
 				const mesh = new THREE.Mesh(geometry, material)
 				this.scene.add(mesh)
 			}
@@ -285,11 +289,11 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.raindropsN = uniform(500)
+			this.raindropsN = uniform(10)
 			this.raindropEnabledN = uniform(this.raindropsN.value)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
-			this.raindropSpawnHeightAverage = uniform(6) // low for debugging purposes
+			this.raindropSpawnHeightAverage = uniform(1) // low for debugging purposes
 			this.raindropSpawnHeightVariance = uniform(3)
 			this.raindropColor = uniform(new THREE.Color(0, 0, 1))
 
@@ -302,7 +306,7 @@
 			// the length might have to be modified with time as well but we'll see
 			this.raindropSpeedHorizontalAverage = uniform(0.1)
 			this.raindropSpeedHorizontalVariance = uniform(0.05)
-			this.raindropSpeedVerticalAverage = uniform(1.5)
+			this.raindropSpeedVerticalAverage = uniform(0.3)
 			this.raindropSpeedVerticalVariance = uniform(0.05)
 
 			this.raindropLengthAverage = uniform(0.3) // in m
@@ -347,7 +351,6 @@
 
 			this.raindrops = instancedArray(this.raindropsN.value, this.raindropStruct)
 			this.wavelets = instancedArray(this.raindropsN.value, this.waveletStruct)
-
 
 			// ======================================================
 			// =                                                    =
@@ -410,8 +413,10 @@
 					//   determine spawn height
 					const z = this.raindropSpawnHeightAverage
 					    .add(
-						    this.n1P1(baseSeedIndex)
-							.mul(this.raindropSpawnHeightVariance))
+						    // this.n1P1(baseSeedIndex)
+							// .mul(this.raindropSpawnHeightVariance)
+							0
+						)
 
 					//   determine x y position
 					const x = this.planeW.mul(
@@ -426,40 +431,47 @@
 					)
 					// determine length
 					const length = this.raindropLengthAverage.add(
-						this.raindropLengthVariance.mul(
-							this.n1P1(baseSeedIndex.add(4)))
+						// this.raindropLengthVariance.mul(
+						// 	this.n1P1(baseSeedIndex.add(4)))
+						0
 					)
 					// determine mass
 					const mass = this.raindropMassAverage.add(
-						this.raindropMassVariance.mul(
-							this.n1P1(baseSeedIndex.add(5)))
+						// this.raindropMassVariance.mul(
+						// 	this.n1P1(baseSeedIndex.add(5)))
+						0
 					)
 
 					// determine yaw
 					const yaw = this.raindropYawAverage.add(
-						this.raindropYawVariance.mul(
-							this.n1P1(baseSeedIndex.add(6)))
+						// this.raindropYawVariance.mul(
+						// 	this.n1P1(baseSeedIndex.add(6)))
+						0
 					)
 
 					// determine pitch
 					const pitch = this.raindropPitchAverage.add(
-						this.raindropPitchVariance.mul(
-							this.n1P1(baseSeedIndex.add(7)))
-						// 0
+						// this.raindropPitchVariance.mul(
+						// 	this.n1P1(baseSeedIndex.add(7)))
+						0
 					)
 
 					// determine horizontal speed
-					const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
-						this.raindropSpeedHorizontalVariance.mul(
-							this.n1P1(baseSeedIndex.add(8))
-						)
-					)
+					const speedHorizontal = 0
+					
+					// this.raindropSpeedHorizontalAverage.add(
+					// 	// this.raindropSpeedHorizontalVariance.mul(
+					// 	// 	this.n1P1(baseSeedIndex.add(8))
+					// 	// )
+					// 	0
+					// )
 
 					// determine vertical speed
 					const speedVertical = this.raindropSpeedVerticalAverage.add(
-						this.raindropSpeedVerticalVariance.mul(
-							this.n1P1(baseSeedIndex.add(9))
-						)
+						// this.raindropSpeedVerticalVariance.mul(
+						// 	this.n1P1(baseSeedIndex.add(9))
+						// )
+						0
 					)
 
 					// generate a velocity based off of pitch, yaw, horizontal,
@@ -472,9 +484,8 @@
 					// const velocity = vec3(vXY.x, vXY.y, vZ)
 
 					const yawDir = rotate(vec2(1, 0), radians(yaw))
-					const pitchDir = rotate(vec3(1, 0, 0), vec3(0, radians(pitch), 0))
 					const vYaw = vec3(yawDir.mul(speedHorizontal), 0)
-					const vPitch = pitchDir.mul(speedVertical)
+					const vPitch = vec3(0, 0, 1).mul(speedVertical).negate()
 
 					const velocity = vYaw.add(vPitch)
 
@@ -620,8 +631,8 @@
 
 					If (generatedWavelet.equal(0), () => {
 						If(newPos.z.lessThanEqual(this.raindropConstHeightGround), () => {
-							this.waveletsGenerateFromRain(instanceIndex, 0)
 							generatedWavelet.assign(1)
+							this.waveletsGenerateFromRain(instanceIndex, 0)
 						})
 					})
 
@@ -925,7 +936,7 @@
 				this.waveletsMeshMaterial.fragmentNode = Fn(() => {
 					// calculate the distance from the center of the node
 					const wavelet = this.wavelets.element(waveletIDInterpolators)
-					// wavelet.get('exists').equal(0).discard()
+					wavelet.get('exists').equal(0).discard()
 
 					const distance = wavelet.get('position').negate().add(positionInterpolators)
 									  .length()
@@ -1062,6 +1073,8 @@
 			this.ticks = 0
 			this.gui.add(this, 'ticks').listen()
 			this.gui.add(this.raindropWidthAverage, 'value', 0, 0.01, 0.001)
+			this.paused = false
+			this.gui.add(this, 'paused').listen()
 
 			// region gpu
 			this.rawGPUSushiPlate = null
@@ -1187,8 +1200,10 @@
 				)
 			}
 			// update physics
-			await this.renderer.computeAsync(this.raindropsComputePhysics)
-			await this.renderer.computeAsync(this.waveletsComputePhysics)
+			if (!this.paused) {
+				await this.renderer.computeAsync(this.raindropsComputePhysics)
+				await this.renderer.computeAsync(this.waveletsComputePhysics)
+			}
 			// update camera projections
 			this.cameraViewMatrix.value = this.camera.matrixWorldInverse
 			this.cameraProjectionMatrix.value = this.camera.projectionMatrix
