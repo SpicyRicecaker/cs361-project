@@ -24,6 +24,7 @@
 		color,
 		cos,
 		distance,
+		float,
 		Fn,
 		hash,
 		If,
@@ -148,6 +149,12 @@
 		playerProjectXY: THREE.Matrix3
 		playerForwardXY: any
 		raindropsGenerateFromCloud: (i: THREE.TSL.ShaderNodeObject<THREE.Node>) => void
+		n1P1: any
+		waveletsVerticesSBA: THREE.StorageBufferAttribute
+		waveletsMeshGeometry: THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap>
+		waveletsMeshMaterial: THREE.MeshBasicMaterial
+		waveletsMesh: THREE.Mesh<any, any, THREE.Object3DEventMap>
+		waveletsGenerateFromRain: (i: THREE.TSL.ShaderNodeObject<THREE.Node>, t: any) => void
 
 		constructor() {
 			// ======================================================
@@ -262,7 +269,7 @@
 				this.playerForwardXY = this.playerForward.clone().applyMatrix3(this.playerProjectXY).normalize()
 				this.playerRight = new THREE.Vector3(1, 0, 0)
 				this.playerUp = new THREE.Vector3(0, 0, 1)
-				this.playerPitch = 70
+				this.playerPitch = -75
 				this.playerYaw = 0
 			}
 			// ======================================================
@@ -315,7 +322,8 @@
 				velocity: { type: 'vec3' },
 				width: 'float',
 				length: 'float',
-				mass: 'float'
+				mass: 'float',
+				generatedWavelet: 'uint'
 			})
 
 			this.waveletStruct = struct({
@@ -368,7 +376,7 @@
 
 				this.scene.add(this.raindropsMesh)
 
-				const n1P1 = (seed: THREE.TSL.ShaderNodeObject<THREE.Node>) => {
+				this.n1P1 = (seed: THREE.TSL.ShaderNodeObject<THREE.Node>) => {
 					// converts [0, 1] to [-1, 1]
 					return hash(seed).mul(2).sub(1)
 				}
@@ -389,61 +397,61 @@
 					// raindrop
 					// after the initializer, time will act as a seed
 
-					const baseSeedIndex = i.add(t).mul(20)
+					const baseSeedIndex = i.add(int(float(100000).mul(t))).mul(20)
 
 					// determine position
 					//   determine spawn height
 					const z = this.raindropSpawnHeightAverage
 					    .add(
-						    n1P1(baseSeedIndex)
+						    this.n1P1(baseSeedIndex)
 							.mul(this.raindropSpawnHeightVariance))
 
 					//   determine x y position
 					const x = this.planeW.mul(
-						n1P1(baseSeedIndex.add(1)).div(2))
+						this.n1P1(baseSeedIndex.add(1)).div(2))
 					const y = this.planeH.mul(
-						n1P1(baseSeedIndex.add(2)).div(2))
+						this.n1P1(baseSeedIndex.add(2)).div(2))
 
 					// determine width
 					const width = this.raindropWidthAverage.add(
 						this.raindropWidthVariance.mul(
-							n1P1(baseSeedIndex.add(3)))
+							this.n1P1(baseSeedIndex.add(3)))
 					)
 					// determine length
 					const length = this.raindropLengthAverage.add(
 						this.raindropLengthVariance.mul(
-							n1P1(baseSeedIndex.add(4)))
+							this.n1P1(baseSeedIndex.add(4)))
 					)
 					// determine mass
 					const mass = this.raindropMassAverage.add(
 						this.raindropMassVariance.mul(
-							n1P1(baseSeedIndex.add(5)))
+							this.n1P1(baseSeedIndex.add(5)))
 					)
 
 					// determine yaw
 					const yaw = this.raindropYawAverage.add(
 						this.raindropYawVariance.mul(
-							n1P1(baseSeedIndex.add(6)))
+							this.n1P1(baseSeedIndex.add(6)))
 					)
 
 					// determine pitch
 					const pitch = this.raindropPitchAverage.add(
 						this.raindropPitchVariance.mul(
-							n1P1(baseSeedIndex.add(7)))
+							this.n1P1(baseSeedIndex.add(7)))
 						// 0
 					)
 
 					// determine horizontal speed
 					const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
 						this.raindropSpeedHorizontalVariance.mul(
-							n1P1(baseSeedIndex.add(8))
+							this.n1P1(baseSeedIndex.add(8))
 						)
 					)
 
 					// determine vertical speed
 					const speedVertical = this.raindropSpeedVerticalAverage.add(
 						this.raindropSpeedVerticalVariance.mul(
-							n1P1(baseSeedIndex.add(9))
+							this.n1P1(baseSeedIndex.add(9))
 						)
 					)
 
@@ -474,6 +482,8 @@
 						.assign(length)
 					raindrop.get('mass')
 						.assign(mass)
+					raindrop.get('generatedWavelet')
+						.assign(0)
 				}
 
 				this.raindropsInit = Fn(() => {
@@ -599,6 +609,15 @@
 
 					const newPos = position.add(changeInPos)
 
+					const generatedWavelet = raindrop.get('generatedWavelet')
+
+					If (generatedWavelet.equal(0), () => {
+						If(newPos.z.lessThanEqual(this.raindropConstHeightGround), () => {
+							this.waveletsGenerateFromRain(instanceIndex, 0)
+							generatedWavelet.assign(1)
+						})
+					})
+
 					// the z component of length
 					const lengthZ = velocity.normalize().mul(length).z
 					
@@ -686,6 +705,272 @@
 				// 	this.scene.add(this.debugRaindrops2)
 				// }
 			}
+			// region wavelets
+			// ======================================================
+			// =                                                    =
+			// =                  CREATE WAVELETS                   =
+			// =                                                    =
+			// =                                                    =
+			// ======================================================
+			{
+				this.waveletsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropsN.value * 4, 4)
+				// initialize mesh indices
+				const waveletMeshIndices = new Uint32Array(this.raindropsN.value * 6)
+				// going to do it on cpu for now, could optimize this later
+				for (let i = 0; i < this.raindropsN.value; i++) {
+					// HOMETOWNMD 1
+					waveletMeshIndices[i * 6] = i * 4
+					waveletMeshIndices[i * 6 + 1] = i * 4 + 1
+					waveletMeshIndices[i * 6 + 2] = i * 4 + 2
+					waveletMeshIndices[i * 6 + 3] = i * 4 + 1
+					waveletMeshIndices[i * 6 + 4] = i * 4 + 3
+					waveletMeshIndices[i * 6 + 5] = i * 4 + 2
+				}
+				const waveletMeshIndicesSBA = new THREE.StorageBufferAttribute(waveletMeshIndices, 1)
+
+				// initialize the ids
+				const waveletIDs = new Uint32Array(this.raindropsN.value * 4)
+				for (let i = 0; i < this.raindropsN.value; i++) {
+					waveletIDs[i * 4    ] = i
+					waveletIDs[i * 4 + 1] = i
+					waveletIDs[i * 4 + 2] = i
+					waveletIDs[i * 4 + 3] = i
+				}
+				const waveletIDsBA = new THREE.BufferAttribute(waveletIDs, 1)
+
+				this.waveletsMeshGeometry = new THREE.BufferGeometry()
+				this.waveletsMeshGeometry.setAttribute('position', this.waveletsVerticesSBA)
+				this.waveletsMeshGeometry.setAttribute('waveletID', waveletIDsBA)
+				this.waveletsMeshGeometry.setIndex(waveletMeshIndicesSBA)
+
+				this.waveletsMeshMaterial = new THREE.MeshBasicMaterial()
+				this.waveletsMeshMaterial.color = new THREE.Color(1, 1, 1)
+
+				this.waveletsMesh = new THREE.Mesh(this.waveletsMeshGeometry, this.waveletsMeshMaterial)
+				this.waveletsMesh.frustumCulled = false
+
+				this.scene.add(this.waveletsMesh)
+
+				// inside each raindrop's compute cell:
+				//   update the 4 vertices associated with the raindrop
+				//     specifically, this.raindropsVertices
+
+				// ======================================================
+				// =                                                    =
+				// =                  RAIN INITIALIZER                  =
+				// =                                                    =
+				// =                                                    =
+				// ======================================================
+				// region init raindrops 
+				this.waveletsGenerateFromRain = (i: THREE.TSL.ShaderNodeObject<THREE.Node>, t) => {
+					// by default, allocate ~20 random seeds for each and every
+					const baseSeedIndex = i.add(int(float(100000).mul(t))).mul(20)
+
+					const raindrop = this.raindrops.element(i)
+
+					const innerRadiusGrowthRate = this.waveletInnerRadiusOverTimeAverage.add(
+						this.waveletInnerRadiusOverTimeVariance.mul(
+							this.n1P1(baseSeedIndex.add(0)))
+					)
+
+					const outerRadiusGrowthRate = this.waveletOuterRadiusOverTimeAverage.add(
+						this.waveletOuterRadiusOverTimeVariance.mul(
+							this.n1P1(baseSeedIndex.add(1)))
+					)
+
+					const maxLifeTime = this.waveletMaxLifetimeAverage.add(
+						this.waveletMaxLifetimeVariance.mul(
+							this.n1P1(baseSeedIndex.add(2)))
+					)
+
+					const minOpacity = this.waveletMinOpacityAverage.add(
+						this.waveletMinOpacityVariance.mul(
+							this.n1P1(baseSeedIndex.add(3)))
+					)
+
+					const opacityGrowthRate = this.waveletOpacityOverTimeAverage.add(
+						this.waveletOpacityOverTimeVariance.mul(
+							this.n1P1(baseSeedIndex.add(4)))
+					)
+
+					const pos = raindrop.get('position')
+
+					const wavelet = this.wavelets.element(i)
+					wavelet.get('position')
+						.assign(pos)
+					wavelet.get('innerRadius')
+						.assign(0)
+					wavelet.get('innerRadiusGrowthRate')
+						.assign(innerRadiusGrowthRate)
+					wavelet.get('outerRadius')
+						.assign(0)
+					wavelet.get('outerRadiusGrowthRate')
+						.assign(outerRadiusGrowthRate)
+					wavelet.get('lifetime')
+						.assign(0)
+					wavelet.get('maxLifeTime')
+						.assign(maxLifeTime)
+					wavelet.get('opacity')
+						.assign(minOpacity)
+					wavelet.get('opacityGrowthRate')
+						.assign(opacityGrowthRate)
+
+					// ======================================================
+					// =                                                    =
+					// =                  WAVELETS MESH COMPUTE             =
+					// =                                                    =
+					// =                                                    =
+					// ======================================================
+					{
+						// 0 --- 2
+						// |   / |
+						// |  c  |
+						// |/    |
+						// 1 --- 3
+
+						// create a 0.5x0.5 wavelet puddle centered around the wavelet
+						// lift the quad above the plane to make sure it's visible
+						const c = vec3(pos.x, pos.y, 0.01)
+
+						// could make these uniforms later
+						const w = 0.5
+						const dw = vec3(0.05, 0, 0)
+						const h = 0.5
+						const dh = vec3(0, 0.05, 0)
+
+						const p0 = c
+									.sub(dw)
+									.add(dh)
+
+						const p1 = c
+									.sub(dw)
+									.sub(dh)
+
+						const p2 = c
+									.add(dw)
+									.add(dh)
+
+						const p3 = c
+									.add(dw)
+									.sub(dh)
+
+						const waveletsMeshGeometry = storage(
+							this.waveletsVerticesSBA,
+							'vec3',
+							this.waveletsVerticesSBA.count);
+
+						waveletsMeshGeometry
+							.element(instanceIndex.mul(4).add(0))
+							.assign(p0)
+
+						waveletsMeshGeometry
+							.element(instanceIndex.mul(4).add(1))
+							.assign(p1)
+
+						waveletsMeshGeometry
+							.element(instanceIndex.mul(4).add(2))
+							.assign(p2)
+
+						waveletsMeshGeometry
+							.element(instanceIndex.mul(4).add(3))
+							.assign(p3)
+					}
+				}
+
+				// // region raindrops vertex
+				// this.raindropsMeshVertexNode = Fn(() => {
+				// 	return vec4(positionGeometry, 1).mul(cameraProjectionMatrix.transpose())
+					
+
+				// 	// return vec4(positionGeometry, 1).mul(this.cameraViewMatrix).mul(this.cameraProjectionMatrix)
+					
+				// 	// mul(cameraProjectionMatrix)
+				// 	// return vec4(positionGeometry, 1)
+				// })()
+
+				// this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
+
+				// region rain physics
+				this.waveletsComputePhysics = Fn(({t = time}) => {
+				})().compute(this.raindropsN.value)
+
+				// region debug spheres
+				// {
+				// 	this.debugRaindropsMaterial = new THREE.SpriteNodeMaterial()
+				// 	this.debugRaindropsMaterial.colorNode = color(0, 0, 0.7)
+				// 	this.debugRaindropsMaterial.positionNode = Fn(() => {
+				// 		// const raindropsMeshGeometry = storage(
+				// 		// this.raindropsVerticesSBA,
+				// 		// 'vec3',
+				// 		// this.raindropsVerticesSBA.count)
+				// 		// return raindropsMeshGeometry.element(instanceIndex)
+				// 		// const raindropsMeshGeometry = 
+				// 		// storage(
+				// 		// this.raindropsVerticesSBA,
+				// 		// 'vec3',
+				// 		// this.raindropsVerticesSBA.count)
+				// 		// raindropsMeshGeometry.element(instanceIndex)
+						
+				// 		return this.raindrops.element(instanceIndex).get('position')
+				// 		// const a = new Float32Array(6)
+				// 		// a[0] = 0
+				// 		// a[1] = 0
+				// 		// a[2] = 0
+				// 		// a[3] = .2
+				// 		// a[4] = 0
+				// 		// a[5] = 0
+				// 		// return instancedArray(a, 'vec3').toAttribute()
+				// 	})()
+				// 	// this.raindropsVerticesSBA
+				// 	this.debugRaindropRadius = uniform(0.01)
+				// 	this.debugRaindropsMaterial.scaleNode = this.debugRaindropRadius
+				// 	// TODO I have no idea what this opacityNode does lol
+				// 	this.debugRaindropsMaterial.opacityNode = shapeCircle()
+
+				// 	this.debugRaindrops = new THREE.Sprite(this.debugRaindropsMaterial)
+				// 	this.debugRaindrops.frustumCulled = false
+				// 	this.debugRaindrops.count = this.raindropN.value
+				// 	// this.debugRaindrops.count = 2
+				// 	this.scene.add(this.debugRaindrops)
+				// }
+				// region debug spheres 2
+				// {
+				// 	this.debugRaindrops2Material = new THREE.SpriteNodeMaterial()
+				// 	this.debugRaindrops2Material.colorNode = color(0, 0, 0.7)
+				// 	this.debugRaindrops2Material.positionNode = Fn(() => {
+				// 		const raindropsMeshGeometry = storage(
+				// 		this.raindropsVerticesSBA,
+				// 		'vec4',
+				// 		this.raindropsVerticesSBA.count)
+				// 		return vec3(
+				// 			raindropsMeshGeometry.element(instanceIndex).x,
+				// 			0,
+				// 			raindropsMeshGeometry.element(instanceIndex).y
+				// 		)
+
+				// 		// const a = new Float32Array(6)
+				// 		// a[0] = 0
+				// 		// a[1] = 0
+				// 		// a[2] = 0
+				// 		// a[3] = .2
+				// 		// a[4] = 0
+				// 		// a[5] = 0
+				// 		// return instancedArray(a, 'vec3').toAttribute()
+				// 	})()
+				// 	// this.raindropsVerticesSBA
+				// 	this.debugRaindrop2Radius = uniform(0.01)
+				// 	this.debugRaindrops2Material.scaleNode = this.debugRaindropRadius
+				// 	// TODO I have no idea what this opacityNode does lol
+				// 	this.debugRaindrops2Material.opacityNode = shapeCircle()
+
+				// 	this.debugRaindrops2 = new THREE.Sprite(this.debugRaindrops2Material)
+				// 	this.debugRaindrops2.frustumCulled = false
+				// 	this.debugRaindrops2.count = this.raindropN.value
+				// 	// this.debugRaindrops.count = 2
+				// 	this.scene.add(this.debugRaindrops2)
+				// }
+			}
+
 			// region gui
 			// ======================================================
 			// =                                                    =
