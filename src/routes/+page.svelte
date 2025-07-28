@@ -16,6 +16,7 @@
 	import {
 		atomicAdd,
 		atomicStore,
+		attribute,
 		bool,
 		cameraPosition,
 		cameraProjectionMatrix,
@@ -23,6 +24,7 @@
 		cameraViewMatrix,
 		color,
 		cos,
+		Discard,
 		distance,
 		float,
 		Fn,
@@ -212,8 +214,8 @@
 			{
 				this.planeNVX = uniform(50)
 				this.planeNVY = uniform(50)
-				this.planeW = uniform(1)
-				this.planeH = uniform(1)
+				this.planeW = uniform(10)
+				this.planeH = uniform(10)
 				const geometry = new THREE.PlaneGeometry(
 					this.planeW.value,
 					this.planeH.value,
@@ -221,7 +223,7 @@
 					this.planeNVY.value
 				)
 				const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
-				material.color = new THREE.Color(0.3, 0, 0)
+				material.color = new THREE.Color(0.01, 0.01, 0.01)
 				const mesh = new THREE.Mesh(geometry, material)
 				this.scene.add(mesh)
 			}
@@ -306,9 +308,9 @@
 			// TODO: need to have very fine grain control over the radius over time... the radius over time of the our radius must converge to less than the inner radius growth at some point
 
 			this.waveletInnerRadiusOverTimeAverage = uniform(0.01) // in m / s
-			this.waveletInnerRadiusOverTimeVariance = uniform(0.005) // can be a function of time, but this is currently not easily modifiable via the gui so will have to keep as const for now
+			this.waveletInnerRadiusOverTimeVariance = uniform(0.001) // can be a function of time, but this is currently not easily modifiable via the gui so will have to keep as const for now
 			this.waveletOuterRadiusOverTimeAverage = uniform(0.02) // can be a function of time
-			this.waveletOuterRadiusOverTimeVariance = uniform(0.01)
+			this.waveletOuterRadiusOverTimeVariance = uniform(0.001)
 			this.waveletMaxLifetimeAverage = uniform(1) // in seconds
 			this.waveletMaxLifetimeVariance = uniform(0.5)
 
@@ -335,7 +337,8 @@
 				lifetime: 'float',
 				maxLifeTime: 'float',
 				opacity: 'float',
-				opacityGrowthRate: 'float'
+				opacityGrowthRate: 'float',
+				exists: 'uint'
 			})
 
 			this.raindrops = instancedArray(this.raindropsN.value, this.raindropStruct)
@@ -814,6 +817,8 @@
 						.assign(minOpacity)
 					wavelet.get('opacityGrowthRate')
 						.assign(opacityGrowthRate)
+					wavelet.get('exists')
+						.assign(1)
 
 					// ======================================================
 					// =                                                    =
@@ -834,9 +839,9 @@
 
 						// could make these uniforms later
 						const w = 0.5
-						const dw = vec3(0.05, 0, 0)
+						const dw = vec3(0.02, 0, 0)
 						const h = 0.5
-						const dh = vec3(0, 0.05, 0)
+						const dh = vec3(0, 0.02, 0)
 
 						const p0 = c
 									.sub(dw)
@@ -877,21 +882,79 @@
 					}
 				}
 
-				// // region raindrops vertex
-				// this.raindropsMeshVertexNode = Fn(() => {
-				// 	return vec4(positionGeometry, 1).mul(cameraProjectionMatrix.transpose())
+				// region wavelets vertex
+				// ======================================================
+				// =                                                    =
+				// =                  WAVELETS MESH COMPUTE             =
+				// =                                                    =
+				// =                                                    =
+				// ======================================================
+				const positionInterpolators = varying(vec3())
+				const waveletIDInterpolators = varying(uint()) // we really don't want to interpolate if possible!
+				// don't want this to interpolate!!!!!!
+				// const indexInterpolators = varying()
+				this.waveletsMeshVertexNode = Fn(() => {
+					positionInterpolators.assign(positionGeometry.xyz)
+					// get attribute
+					waveletIDInterpolators.assign(attribute('waveletID'))
+					return vec4(positionGeometry, 1)
+							.mul(cameraViewMatrix.transpose())
+							.mul(cameraProjectionMatrix.transpose())
+				})()
+
+				this.waveletsMeshMaterial.vertexNode = this.waveletsMeshVertexNode
+
+				// region wavelets fragment
+				// ======================================================
+				// =                                                    =
+				// =                  WAVELETS FRAGMENT                 =
+				// =                                                    =
+				// =                                                    =
+				// ======================================================
+				this.waveletsMeshMaterial.fragmentNode = Fn(() => {
+					// calculate the distance from the center of the node
+					const wavelet = this.wavelets.element(waveletIDInterpolators)
+					const distance = wavelet.get('position').negate().add(positionInterpolators)
+									  .length()
+									  
+					// distance.greaterThanEqual(wavelet.get('innerRadius'))
+					// 	    .and()
+					// 	    .lessThanEqual(wavelet.get('outerRadius'))
+					// 		.not()
+					// 		.discard()
+
+					// distance.greaterThan(0.01).discard()
 					
+					// return color(1, 1, 1)
+					// return distance.mul(color(1, 1, 1))
+					// return wavelet.get('innerRadius').mul(color(1, 1, 1))
+					// return wavelet.get('outerRadius').mul(color(1, 1, 1))
+					return color(1, 1, 1)
+				})()
 
-				// 	// return vec4(positionGeometry, 1).mul(this.cameraViewMatrix).mul(this.cameraProjectionMatrix)
-					
-				// 	// mul(cameraProjectionMatrix)
-				// 	// return vec4(positionGeometry, 1)
-				// })()
+				// region wavelet physics
+				this.waveletsComputePhysics = Fn(() => {
+					// let the amount of time passed be prop to the lifetime over the maxlifetime
 
-				// this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
+					const wavelet = this.wavelets.element(instanceIndex)
 
-				// region rain physics
-				this.waveletsComputePhysics = Fn(({t = time}) => {
+					If(wavelet.get('lifetime').greaterThanEqual(wavelet.get('maxLifeTime')), () => {
+						// set exists to false
+						wavelet.get('exists').assign(0)
+					}).Else(() => {
+						wavelet.get('lifetime').addAssign(this.dtS)
+
+						wavelet.get('innerRadius').addAssign(
+							wavelet.get('innerRadiusGrowthRate').mul(this.dtS)
+						)
+						wavelet.get('outerRadius').addAssign(
+							wavelet.get('outerRadiusGrowthRate').mul(this.dtS)
+						)
+
+						wavelet.get('opacity').addAssign(
+							wavelet.get('opacityGrowthRate').mul(this.dtS)
+						)
+					})
 				})().compute(this.raindropsN.value)
 
 				// region debug spheres
@@ -1108,6 +1171,7 @@
 			}
 			// update physics
 			await this.renderer.computeAsync(this.raindropsComputePhysics)
+			await this.renderer.computeAsync(this.waveletsComputePhysics)
 			// update camera projections
 			this.cameraViewMatrix.value = this.camera.matrixWorldInverse
 			this.cameraProjectionMatrix.value = this.camera.projectionMatrix
