@@ -164,6 +164,7 @@
 		waveletsMeshVertexNode: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
 		waveletsComputePhysics: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 		paused: boolean
+		raindropsDebugNSqrt: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 
 		constructor() {
 			// ======================================================
@@ -221,11 +222,11 @@
 			{
 				this.planeNVX = uniform(50)
 				this.planeNVY = uniform(50)
-				this.planeW = uniform(1)
-				this.planeH = uniform(1)
+				this.planeW = uniform(1.)
+				this.planeH = uniform(1.)
 				const geometry = new THREE.PlaneGeometry(
-					this.planeW.value * 5,
-					this.planeH.value * 5,
+					this.planeW.value,
+					this.planeH.value,
 					this.planeNVX.value,
 					this.planeNVY.value
 				)
@@ -238,8 +239,8 @@
 			}
 			// add debug axis
 			{
-				// const axesHelper = new THREE.AxesHelper(5)
-				// this.scene.add(axesHelper)
+				const axesHelper = new THREE.AxesHelper(5)
+				this.scene.add(axesHelper)
 			}
 			// init input
 			{
@@ -289,7 +290,8 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.raindropsN = uniform(10)
+			this.raindropsDebugNSqrt = uniform(2)
+			this.raindropsN = uniform(this.raindropsDebugNSqrt.value * this.raindropsDebugNSqrt.value)
 			this.raindropEnabledN = uniform(this.raindropsN.value)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
@@ -418,11 +420,35 @@
 							0
 						)
 
+					// -----------debug---------------
+					// const x = float(0.5).negate()
+					// const y = float(0.5)
+					// calculate iX
+					const iY = instanceIndex.div(this.raindropsDebugNSqrt)
+					// calcualte iY
+					const iX = instanceIndex.sub(iY.mul(this.raindropsDebugNSqrt))
+					const dX = this.planeW.div(this.raindropsDebugNSqrt)
+					const dY = this.planeH.div(this.raindropsDebugNSqrt).negate()
+					const offsetX = dX.div(2.)
+					const offsetY = dY.div(2.)
+					const cornerX = float(0.).sub(this.planeW.div(2.))
+					const cornerY = float(0.).sub(this.planeH.div(2.))
+
+					// const x = float(iX).mul(dX).add(offsetX).sub(cornerX)
+					// const y = float(iY).mul(dY).add(offsetY).add(cornerY)
+
+					const x = float(iX).mul(dX).add(offsetX).add(-0.5)
+					const y = float(iY).mul(dY).add(offsetY).add(0.5)
+
+					// const x = instanceIndex.div(4)
+					// const y = instanceIndex.sub(x.mul(4))
+					// -----------end debug---------------
+
 					//   determine x y position
-					const x = this.planeW.mul(
-						this.n1P1(baseSeedIndex.add(1)).div(2))
-					const y = this.planeH.mul(
-						this.n1P1(baseSeedIndex.add(2)).div(2))
+					// const x = this.planeW.mul(
+					// 	this.n1P1(baseSeedIndex.add(1)).div(2))
+					// const y = this.planeH.mul(
+					// 	this.n1P1(baseSeedIndex.add(2)).div(2))
 
 					// determine width
 					const width = this.raindropWidthAverage.add(
@@ -1121,6 +1147,9 @@
 		handleKeyDown = (e: KeyboardEvent) => {
 			if (this.inputAcceptedKeys.includes(e.code)) {
 				this.inputKeysHeld[e.code] = true
+			}
+			if (e.code == 'KeyP') {
+				this.paused = !this.paused
 			}
 		}
 		handleHeldKeys = () => {
