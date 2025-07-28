@@ -1133,6 +1133,7 @@
 			this.gui.add(this.raindropWidthAverage, 'value', 0, 0.01, 0.001)
 			this.paused = false
 			this.gui.add(this, 'paused').listen()
+			this.gui.add(this.raindropEnabledN, 'value', 0, this.raindropsN.value, 1)
 
 			// region gpu
 			this.rawGPUSushiPlate = null
@@ -1215,7 +1216,9 @@
 					Object.entries(this.inputEventToListenerList).forEach(([v, k]) =>
 						(window as any).removeEventListener(v, k)
 					)
-					this.renderer.setAnimationLoop(() => {})
+					// this.renderer.setAnimationLoop(() => {})
+					this.renderer.dispose()
+					this.gui.destroy()
 				})
 			}
 		}
