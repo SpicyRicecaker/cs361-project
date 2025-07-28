@@ -992,6 +992,7 @@
 					// wavelet.get('exists').equal(0).discard()
 					// wavelet.get('lifetime').equal(0).discard()
 					wavelet.get('maxRadius').equal(0).discard()
+					waveletIDInterpolators.greaterThanEqual(this.raindropEnabledN).discard()
 					// wavelet.get('maxLifeTime').equal(0).discard()
 					// wavelet.get('opacity').equal(0).discard()
 					// wavelet.get('opacityGrowthRate').equal(0).discard()
