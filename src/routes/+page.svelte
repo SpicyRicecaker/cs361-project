@@ -382,8 +382,19 @@
 				}
 				const raindropsMeshIndicesSBA = new THREE.StorageBufferAttribute(raindropsMeshIndices, 1)
 
+				// initialize the ids
+				const raindropIDs = new Uint32Array(this.raindropsN.value * 4)
+				for (let i = 0; i < this.raindropsN.value; i++) {
+					raindropIDs[i * 4    ] = i
+					raindropIDs[i * 4 + 1] = i
+					raindropIDs[i * 4 + 2] = i
+					raindropIDs[i * 4 + 3] = i
+				}
+				const raindropIDsBA = new THREE.BufferAttribute(raindropIDs, 1)
+
 				this.raindropsMeshGeometry = new THREE.BufferGeometry()
 				this.raindropsMeshGeometry.setAttribute('position', this.raindropsVerticesSBA)
+				this.raindropsMeshGeometry.setAttribute('raindropID', raindropIDsBA)
 				this.raindropsMeshGeometry.setIndex(raindropsMeshIndicesSBA)
 				this.raindropsMeshMaterial = new THREE.MeshBasicMaterial()
 				this.raindropsMeshMaterial.color = new THREE.Color(1, 1, 1)
@@ -637,8 +648,13 @@
 
 				// region raindrops vertex
 				const raindropsDepthInterpolators = varying(float())
+				const raindropIDInterpolators = varying(uint()) // we really don't want to interpolate if possible!
+
 				this.raindropsMeshVertexNode = Fn(() => {
 					const pos = attribute('position')
+					
+					raindropIDInterpolators.assign(attribute('raindropID'))
+
 					const newPos = pos.mul(cameraProjectionMatrix.transpose())
 					raindropsDepthInterpolators.assign(
 						float(1.)
@@ -655,6 +671,7 @@
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
 				this.raindropsMeshMaterial.fragmentNode = Fn(() => {
+					raindropIDInterpolators.greaterThanEqual(this.raindropEnabledN).discard()
 					return raindropsDepthInterpolators.mul(color(0.7, 0.7, 0.7))
 					// return color(0.7, 0.7, 0.7)
 				})()
