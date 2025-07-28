@@ -134,13 +134,9 @@
 		debugRaindrop2Radius: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		debugRaindrops2: THREE.Sprite<THREE.Object3DEventMap>
 		cameraProjectionMatrix: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Matrix4>>
-		raindropsGenerateFromCloud: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
-		raindropsComputeFromCloud: any
 		raindropsComputePhysics: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 		lastTimeStamp: number | null
 		dtS: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropVelocityAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropVelocityVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropSpeedHorizontalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropSpeedHorizontalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropSpeedVerticalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
@@ -287,7 +283,7 @@
 			// the length might have to be modified with time as well but we'll see
 			this.raindropSpeedHorizontalAverage = uniform(0.1)
 			this.raindropSpeedHorizontalVariance = uniform(0.05)
-			this.raindropSpeedVerticalAverage = uniform(1)
+			this.raindropSpeedVerticalAverage = uniform(1.5)
 			this.raindropSpeedVerticalVariance = uniform(0.05)
 
 			this.raindropLengthAverage = uniform(0.3) // in m
@@ -383,12 +379,12 @@
 				// =                                                    =
 				// ======================================================
 				// region init raindrops 
-				this.raindropsGenerateFromCloud = Fn(({t = time}) => {
+				this.raindropsGenerateFromCloud = (i: THREE.TSL.ShaderNodeObject<THREE.Node>) => {
 					// by default, allocate ~20 random seeds for each and every
 					// raindrop
 					// after the initializer, time will act as a seed
 
-					const baseSeedIndex = instanceIndex.mul(20)
+					const baseSeedIndex = i.mul(20)
 
 					// determine position
 					//   determine spawn height
@@ -402,7 +398,6 @@
 						n1P1(baseSeedIndex.add(1)).div(2))
 					const y = this.planeH.mul(
 						n1P1(baseSeedIndex.add(2)).div(2))
-
 
 					// determine width
 					const width = this.raindropWidthAverage.add(
@@ -455,7 +450,7 @@
 					const vZ = dir.z.mul(speedVertical).negate()
 					const velocity = vec3(vXY.x, vXY.y, vZ)
 
-					const raindrop = this.raindrops.element(instanceIndex)
+					const raindrop = this.raindrops.element(i)
 					raindrop.get('position')
 						.assign(vec3(x, y, z))
 					raindrop.get('velocity')
@@ -466,9 +461,11 @@
 						.assign(length)
 					raindrop.get('mass')
 						.assign(mass)
-				})()
+				}
 
-				this.raindropsInit = this.raindropsGenerateFromCloud.compute(this.raindropsN.value)
+				this.raindropsInit = Fn(() => {
+					this.raindropsGenerateFromCloud(instanceIndex)
+				})().compute(this.raindropsN.value)
 
 				// ======================================================
 				// =                                                    =
@@ -584,10 +581,20 @@
 					const raindrop = this.raindrops.element(instanceIndex)
 					const position = raindrop.get('position')
 					const velocity = raindrop.get('velocity')
-
+					const length = raindrop.get('length')
 					const changeInPos = velocity.mul(this.dtS)
 
-					position.addAssign(changeInPos)
+					const newPos = position.add(changeInPos)
+
+					// the z component of length
+					const lengthZ = velocity.normalize().mul(length).z
+					
+					If(newPos.z.lessThanEqual(this.raindropConstHeightGround.add(lengthZ)), () => {
+						this.raindropsGenerateFromCloud(instanceIndex)
+					}).Else(() => {
+						position.assign(newPos)
+					})
+
 				})().compute(this.raindropsN.value)
 
 				// region debug spheres
