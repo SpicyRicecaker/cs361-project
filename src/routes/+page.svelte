@@ -351,8 +351,12 @@
 				exists: 'uint'
 			})
 
-			this.raindrops = instancedArray(this.raindropsN.value * 2, this.raindropStruct)
-			const waveletStructBuffer = new Uint32Array(this.raindropsN.value * 11)
+			// IMPORTANT: as of v178.0 need to manually calculate padding values
+			// for developing, probably just set to some high number
+			// important that for deployment, we keep this as low as possible for performance
+			const raindropStructBuffer = new Uint32Array(this.raindropsN.value * 12)
+			this.raindrops = instancedArray(raindropStructBuffer, this.raindropStruct)
+			const waveletStructBuffer = new Uint32Array(this.raindropsN.value * 12)
 			this.wavelets = instancedArray(waveletStructBuffer, this.waveletStruct)
 
 			// ======================================================
