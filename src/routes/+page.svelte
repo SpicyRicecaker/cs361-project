@@ -43,6 +43,7 @@
 		modelWorldMatrixInverse,
 		radians,
 		rotate,
+		round,
 		shapeCircle,
 		sin,
 		sqrt,
@@ -157,6 +158,10 @@
 		waveletsMeshMaterial: THREE.MeshBasicMaterial
 		waveletsMesh: THREE.Mesh<any, any, THREE.Object3DEventMap>
 		waveletsGenerateFromRain: (i: THREE.TSL.ShaderNodeObject<THREE.Node>, t: any) => void
+		waveletMaxRadiusAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletMaxRadiusVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		waveletsMeshVertexNode: THREE.TSL.ShaderNodeObject<THREE.TSL.ShaderCallNodeInternal>
+		waveletsComputePhysics: THREE.TSL.ShaderNodeObject<THREE.ComputeNode>
 
 		constructor() {
 			// ======================================================
@@ -171,7 +176,7 @@
 				0.00001,
 				1000
 			)
-			this.camera.position.z = 1.8
+			this.camera.position.z = 0.5
 			this.camera.up = new THREE.Vector3(0, 0, 1)
 			this.camera.lookAt(0, 1, 1.8)
 			// update camera
@@ -214,8 +219,8 @@
 			{
 				this.planeNVX = uniform(50)
 				this.planeNVY = uniform(50)
-				this.planeW = uniform(10)
-				this.planeH = uniform(10)
+				this.planeW = uniform(5)
+				this.planeH = uniform(5)
 				const geometry = new THREE.PlaneGeometry(
 					this.planeW.value,
 					this.planeH.value,
@@ -229,8 +234,8 @@
 			}
 			// add debug axis
 			{
-				const axesHelper = new THREE.AxesHelper(5)
-				this.scene.add(axesHelper)
+				// const axesHelper = new THREE.AxesHelper(5)
+				// this.scene.add(axesHelper)
 			}
 			// init input
 			{
@@ -280,7 +285,7 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.raindropsN = uniform(50)
+			this.raindropsN = uniform(500)
 			this.raindropEnabledN = uniform(this.raindropsN.value)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
@@ -307,10 +312,12 @@
 
 			// TODO: need to have very fine grain control over the radius over time... the radius over time of the our radius must converge to less than the inner radius growth at some point
 
-			this.waveletInnerRadiusOverTimeAverage = uniform(0.01) // in m / s
-			this.waveletInnerRadiusOverTimeVariance = uniform(0.001) // can be a function of time, but this is currently not easily modifiable via the gui so will have to keep as const for now
-			this.waveletOuterRadiusOverTimeAverage = uniform(0.02) // can be a function of time
-			this.waveletOuterRadiusOverTimeVariance = uniform(0.001)
+			// this.waveletInnerRadiusOverTimeAverage = uniform(0.01) // in m / s
+			// this.waveletInnerRadiusOverTimeVariance = uniform(0.001) // can be a function of time, but this is currently not easily modifiable via the gui so will have to keep as const for now
+			// this.waveletOuterRadiusOverTimeAverage = uniform(0.02) // can be a function of time
+			// this.waveletOuterRadiusOverTimeVariance = uniform(0.001)
+			this.waveletMaxRadiusAverage = uniform(0.03)
+			this.waveletMaxRadiusVariance = uniform(0.005)
 			this.waveletMaxLifetimeAverage = uniform(1) // in seconds
 			this.waveletMaxLifetimeVariance = uniform(0.5)
 
@@ -330,10 +337,7 @@
 
 			this.waveletStruct = struct({
 				position: { type: 'vec3' },
-				innerRadius: 'float',
-				innerRadiusGrowthRate: 'float',
-				outerRadius: 'float',
-				outerRadiusGrowthRate: 'float',
+				maxRadius: 'float', 
 				lifetime: 'float',
 				maxLifeTime: 'float',
 				opacity: 'float',
@@ -716,6 +720,23 @@
 			// =                                                    =
 			// ======================================================
 			{
+				// code copied from 
+				// https://easings.net/#easeOutQuint
+				const easeOutQuint = (
+					t: THREE.TSL.ShaderNodeObject<THREE.Node>
+				) => {
+					return t.oneMinus().pow(5).oneMinus()
+				}
+
+				// code copied from 
+				// https://easings.net/#easeOutQuint
+				const easeOutCubic = (
+					t: THREE.TSL.ShaderNodeObject<THREE.Node>
+				) => {
+					return t.oneMinus().pow(3).oneMinus()
+				}
+
+
 				this.waveletsVerticesSBA = new THREE.StorageBufferAttribute(this.raindropsN.value * 4, 4)
 				// initialize mesh indices
 				const waveletMeshIndices = new Uint32Array(this.raindropsN.value * 6)
@@ -760,40 +781,35 @@
 
 				// ======================================================
 				// =                                                    =
-				// =                  RAIN INITIALIZER                  =
+				// =                  WAVELET INITIALIZER               =
 				// =                                                    =
 				// =                                                    =
 				// ======================================================
-				// region init raindrops 
+				// region init wavelets 
 				this.waveletsGenerateFromRain = (i: THREE.TSL.ShaderNodeObject<THREE.Node>, t) => {
 					// by default, allocate ~20 random seeds for each and every
 					const baseSeedIndex = i.add(int(float(100000).mul(t))).mul(20)
 
 					const raindrop = this.raindrops.element(i)
 
-					const innerRadiusGrowthRate = this.waveletInnerRadiusOverTimeAverage.add(
-						this.waveletInnerRadiusOverTimeVariance.mul(
+					const maxRadius = this.waveletMaxRadiusAverage.add(
+						this.waveletMaxRadiusVariance.mul(
 							this.n1P1(baseSeedIndex.add(0)))
-					)
-
-					const outerRadiusGrowthRate = this.waveletOuterRadiusOverTimeAverage.add(
-						this.waveletOuterRadiusOverTimeVariance.mul(
-							this.n1P1(baseSeedIndex.add(1)))
 					)
 
 					const maxLifeTime = this.waveletMaxLifetimeAverage.add(
 						this.waveletMaxLifetimeVariance.mul(
-							this.n1P1(baseSeedIndex.add(2)))
+							this.n1P1(baseSeedIndex.add(1)))
 					)
 
 					const minOpacity = this.waveletMinOpacityAverage.add(
 						this.waveletMinOpacityVariance.mul(
-							this.n1P1(baseSeedIndex.add(3)))
+							this.n1P1(baseSeedIndex.add(2)))
 					)
 
 					const opacityGrowthRate = this.waveletOpacityOverTimeAverage.add(
 						this.waveletOpacityOverTimeVariance.mul(
-							this.n1P1(baseSeedIndex.add(4)))
+							this.n1P1(baseSeedIndex.add(3)))
 					)
 
 					const pos = raindrop.get('position')
@@ -801,14 +817,8 @@
 					const wavelet = this.wavelets.element(i)
 					wavelet.get('position')
 						.assign(pos)
-					wavelet.get('innerRadius')
-						.assign(0)
-					wavelet.get('innerRadiusGrowthRate')
-						.assign(innerRadiusGrowthRate)
-					wavelet.get('outerRadius')
-						.assign(0)
-					wavelet.get('outerRadiusGrowthRate')
-						.assign(outerRadiusGrowthRate)
+					wavelet.get('maxRadius')
+						.assign(maxRadius)
 					wavelet.get('lifetime')
 						.assign(0)
 					wavelet.get('maxLifeTime')
@@ -826,6 +836,7 @@
 					// =                                                    =
 					// =                                                    =
 					// ======================================================
+					// region wavelets mesh compute
 					{
 						// 0 --- 2
 						// |   / |
@@ -839,9 +850,9 @@
 
 						// could make these uniforms later
 						const w = 0.5
-						const dw = vec3(0.02, 0, 0)
+						const dw = vec3(0.05, 0, 0)
 						const h = 0.5
-						const dh = vec3(0, 0.02, 0)
+						const dh = vec3(0, 0.05, 0)
 
 						const p0 = c
 									.sub(dw)
@@ -914,14 +925,24 @@
 				this.waveletsMeshMaterial.fragmentNode = Fn(() => {
 					// calculate the distance from the center of the node
 					const wavelet = this.wavelets.element(waveletIDInterpolators)
+					// wavelet.get('exists').equal(0).discard()
+
 					const distance = wavelet.get('position').negate().add(positionInterpolators)
 									  .length()
+					
+					const lifetime = wavelet.get('lifetime')
+					const maxLifetime = wavelet.get('maxLifeTime')
+					const maxRadius = wavelet.get('maxRadius')
+					const t = lifetime.div(maxLifetime)
 									  
-					// distance.greaterThanEqual(wavelet.get('innerRadius'))
-					// 	    .and()
-					// 	    .lessThanEqual(wavelet.get('outerRadius'))
-					// 		.not()
-					// 		.discard()
+					const innerRadius = easeOutCubic(t).mul(maxRadius)
+					const outerRadius = easeOutQuint(t).mul(maxRadius)
+
+					distance.lessThanEqual(innerRadius)
+						    .or(
+								distance.greaterThanEqual(outerRadius)
+							)
+							.discard()
 
 					// distance.greaterThan(0.01).discard()
 					
@@ -938,22 +959,18 @@
 
 					const wavelet = this.wavelets.element(instanceIndex)
 
-					If(wavelet.get('lifetime').greaterThanEqual(wavelet.get('maxLifeTime')), () => {
-						// set exists to false
-						wavelet.get('exists').assign(0)
-					}).Else(() => {
-						wavelet.get('lifetime').addAssign(this.dtS)
+					const exists = wavelet.get('exists')
+					If(exists.equal(1), () => {
+						If(wavelet.get('lifetime').greaterThanEqual(wavelet.get('maxLifeTime')), () => {
+							// set exists to false
+							exists.assign(0)
+						}).Else(() => {
+							wavelet.get('lifetime').addAssign(this.dtS)
 
-						wavelet.get('innerRadius').addAssign(
-							wavelet.get('innerRadiusGrowthRate').mul(this.dtS)
-						)
-						wavelet.get('outerRadius').addAssign(
-							wavelet.get('outerRadiusGrowthRate').mul(this.dtS)
-						)
-
-						wavelet.get('opacity').addAssign(
-							wavelet.get('opacityGrowthRate').mul(this.dtS)
-						)
+							wavelet.get('opacity').addAssign(
+								wavelet.get('opacityGrowthRate').mul(this.dtS)
+							)
+						})
 					})
 				})().compute(this.raindropsN.value)
 
