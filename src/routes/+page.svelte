@@ -636,14 +636,15 @@
 				})().compute(this.raindropsN.value)
 
 				// region raindrops vertex
-				const depthInterpolators = varying(float())
+				const raindropsDepthInterpolators = varying(float())
 				this.raindropsMeshVertexNode = Fn(() => {
 					const pos = attribute('position')
 					const newPos = pos.mul(cameraProjectionMatrix.transpose())
-					depthInterpolators.assign(
+					raindropsDepthInterpolators.assign(
 						float(1.)
 						.sub(
-							newPos.z.div(2)))
+							// todo fix!! not sure why w doesn't work here
+							newPos.z.div(3)))
 					return newPos
 
 					// return vec4(positionGeometry, 1).mul(this.cameraViewMatrix).mul(this.cameraProjectionMatrix)
@@ -654,7 +655,7 @@
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
 				this.raindropsMeshMaterial.fragmentNode = Fn(() => {
-					return depthInterpolators.mul(color(0.7, 0.7, 0.7))
+					return raindropsDepthInterpolators.mul(color(0.7, 0.7, 0.7))
 					// return color(0.7, 0.7, 0.7)
 				})()
 
@@ -956,15 +957,24 @@
 				// ======================================================
 				const positionInterpolators = varying(vec3())
 				const waveletIDInterpolators = varying(uint()) // we really don't want to interpolate if possible!
+				const waveletsDepthInterpolators = varying(float())
+
 				// don't want this to interpolate!!!!!!
 				// const indexInterpolators = varying()
 				this.waveletsMeshVertexNode = Fn(() => {
 					positionInterpolators.assign(positionGeometry.xyz)
 					// get attribute
 					waveletIDInterpolators.assign(attribute('waveletID'))
-					return positionGeometry
-							.mul(cameraViewMatrix.transpose())
-							.mul(cameraProjectionMatrix.transpose())
+					const newPos = positionGeometry
+									.mul(cameraViewMatrix.transpose())
+									.mul(cameraProjectionMatrix.transpose())
+
+					waveletsDepthInterpolators.assign(
+						float(1.)
+						.sub(
+							// todo fix!! not sure why w doesn't work here
+							newPos.z.div(4.5)))
+					return newPos
 				})()
 
 				this.waveletsMeshMaterial.vertexNode = this.waveletsMeshVertexNode
@@ -1009,7 +1019,7 @@
 					// return distance.mul(color(1, 1, 1))
 					// return wavelet.get('innerRadius').mul(color(1, 1, 1))
 					// return wavelet.get('outerRadius').mul(color(1, 1, 1))
-					return color(1, 1, 1).mul(0.4)
+					return waveletsDepthInterpolators.mul(color(1, 1, 1).mul(0.7))
 				})()
 
 				// region wavelet physics
