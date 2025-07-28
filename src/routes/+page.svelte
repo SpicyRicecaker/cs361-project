@@ -145,6 +145,9 @@
 		raindropYawVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropColor: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Color>>
 		rainColor: void
+		playerProjectXY: THREE.Matrix3
+		playerForwardXY: any
+		raindropsGenerateFromCloud: (i: THREE.TSL.ShaderNodeObject<THREE.Node>) => void
 
 		constructor() {
 			// ======================================================
@@ -255,6 +258,8 @@
 				this.playerVelocity = new THREE.Vector3(0, 0, 0)
 				this.playerForwardDefault = new THREE.Vector3(0, 1, 0)
 				this.playerForward = new THREE.Vector3(0, 1, 0)
+				this.playerProjectXY = new THREE.Matrix3(1, 0, 0, 0, 1, 0, 0, 0 ,0)
+				this.playerForwardXY = this.playerForward.clone().applyMatrix3(this.playerProjectXY).normalize()
 				this.playerRight = new THREE.Vector3(1, 0, 0)
 				this.playerUp = new THREE.Vector3(0, 0, 1)
 				this.playerPitch = 70
@@ -276,8 +281,8 @@
 
 			this.raindropWidthAverage = uniform(0.001)
 			this.raindropWidthVariance = uniform(0.0001)
-			this.raindropPitchAverage = uniform(-45) // in degrees
-			this.raindropPitchVariance = uniform(1)
+			this.raindropPitchAverage = uniform(-90) // in degrees
+			this.raindropPitchVariance = uniform(0)
 			this.raindropYawAverage = uniform(180) // in degrees
 			this.raindropYawVariance = uniform(2)
 			// the length might have to be modified with time as well but we'll see
@@ -417,38 +422,47 @@
 
 					// determine yaw
 					const yaw = this.raindropYawAverage.add(
-						this.raindropYawVariance.mul(
-							n1P1(baseSeedIndex.add(6)))
+						// this.raindropYawVariance.mul(
+						// 	n1P1(baseSeedIndex.add(6)))
 					)
 
 					// determine pitch
 					const pitch = this.raindropPitchAverage.add(
 						this.raindropPitchVariance.mul(
 							n1P1(baseSeedIndex.add(7)))
+						// 0
 					)
 
 					// determine horizontal speed
-					const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
-						this.raindropSpeedHorizontalVariance.mul(
-							n1P1(baseSeedIndex.add(8))
-						)
-					)
+					// const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
+					// 	this.raindropSpeedHorizontalVariance.mul(
+					// 		n1P1(baseSeedIndex.add(8))
+					// 	)
+					// )
+					const speedHorizontal = 0
 
 					// determine vertical speed
 					const speedVertical = this.raindropSpeedVerticalAverage.add(
 						this.raindropSpeedVerticalVariance.mul(
 							n1P1(baseSeedIndex.add(9))
 						)
-					).negate()
+					)
 
 					// generate a velocity based off of pitch, yaw, horizontal,
 					// and vertical velocity
-					const dir = rotate(
-							rotate(vec3(1, 0, 0), vec3(0, pitch, 0)), 
-							vec3(0, 0, yaw))
-					const vXY = dir.xy.mul(speedHorizontal)
-					const vZ = dir.z.mul(speedVertical).negate()
-					const velocity = vec3(vXY.x, vXY.y, vZ)
+					// const dir = rotate(
+					// 		rotate(vec3(1, 0, 0), vec3(0, pitch, 0)), 
+					// 		vec3(0, 0, yaw))
+					// const vXY = dir.xy.mul(speedHorizontal)
+					// const vZ = dir.z.mul(speedVertical).negate()
+					// const velocity = vec3(vXY.x, vXY.y, vZ)
+
+					const yawDir = rotate(vec2(1, 0), radians(yaw))
+					const pitchDir = rotate(vec3(1, 0, 0), vec3(0, radians(pitch), 0))
+					const vYaw = vec3(yawDir.mul(speedHorizontal), 0)
+					const vPitch = pitchDir.mul(speedVertical)
+
+					const velocity = vYaw.add(vPitch)
 
 					const raindrop = this.raindrops.element(i)
 					raindrop.get('position')
@@ -735,10 +749,10 @@
 		handleHeldKeys = () => {
 			const walkVelocity = 0.01
 			if (this.inputKeysHeld['KeyW']) {
-				this.playerVelocity.add(this.playerForward.clone().multiplyScalar(walkVelocity))
+				this.playerVelocity.add(this.playerForwardXY.clone().multiplyScalar(walkVelocity))
 			}
 			if (this.inputKeysHeld['KeyS']) {
-				this.playerVelocity.sub(this.playerForward.clone().multiplyScalar(walkVelocity))
+				this.playerVelocity.sub(this.playerForwardXY.clone().multiplyScalar(walkVelocity))
 			}
 			if (this.inputKeysHeld['KeyA']) {
 				this.playerVelocity.sub(this.playerRight.clone().multiplyScalar(walkVelocity))
@@ -794,7 +808,8 @@
 				const eulerYaw = new THREE.Euler(0, 0, mRadians(this.playerYaw))
 				this.playerForward = this.playerForwardDefault.clone().applyEuler(eulerPitch)
 				this.playerForward.applyEuler(eulerYaw)
-				this.playerRight.crossVectors(this.playerForward, this.playerUp)
+				this.playerRight.crossVectors(this.playerForward, this.playerUp).normalize()
+				this.playerForwardXY = this.playerForward.clone().applyMatrix3(this.playerProjectXY).normalize()
 				this.camera.lookAt(this.camera.position.clone().add(this.playerForward))
 
 				this.playerVelocity.set(0, 0, 0)
