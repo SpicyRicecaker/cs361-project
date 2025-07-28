@@ -90,8 +90,8 @@
 		raindropSpawnHeightVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropWidthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropWidthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropAngleOfAttackAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropAngleOfAttackVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropPitchAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropPitchVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropLengthAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropLengthVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropMassAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
@@ -141,10 +141,12 @@
 		dtS: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropVelocityAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropVelocityVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropVelocityHorizontalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropVelocityHorizontalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropVelocityVerticalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
-		raindropVelocityVerticalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropSpeedHorizontalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropSpeedHorizontalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropSpeedVerticalAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropSpeedVerticalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropYawAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropYawVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 
 		constructor() {
 			// ======================================================
@@ -284,13 +286,15 @@
 
 			this.raindropWidthAverage = uniform(0.01)
 			this.raindropWidthVariance = uniform(0.01)
-			this.raindropAngleOfAttackAverage = uniform(45) // in degrees
-			this.raindropAngleOfAttackVariance = uniform(1)
+			this.raindropPitchAverage = uniform(-45) // in degrees
+			this.raindropPitchVariance = uniform(1)
+			this.raindropYawAverage = uniform(180) // in degrees
+			this.raindropYawVariance = uniform(2)
 			// the length might have to be modified with time as well but we'll see
-			this.raindropVelocityHorizontalAverage = uniform(0.1)
-			this.raindropVelocityHorizontalVariance = uniform(0.05)
-			this.raindropVelocityVerticalAverage = uniform(1)
-			this.raindropVelocityVerticalVariance = uniform(0.05)
+			this.raindropSpeedHorizontalAverage = uniform(0.1)
+			this.raindropSpeedHorizontalVariance = uniform(0.05)
+			this.raindropSpeedVerticalAverage = uniform(1)
+			this.raindropSpeedVerticalVariance = uniform(0.05)
 
 			this.raindropLengthAverage = uniform(0.1) // in m
 			this.raindropLengthVariance = uniform(0.01)
@@ -316,7 +320,6 @@
 				velocity: { type: 'vec3' },
 				width: 'float',
 				length: 'float',
-				angleOfAttack: 'float',
 				mass: 'float'
 			})
 
@@ -405,52 +408,68 @@
 						n1P1(baseSeedIndex.add(1)).div(2))
 					const y = this.planeH.mul(
 						n1P1(baseSeedIndex.add(2)).div(2))
-					// determine angle of attack
-					const alpha = this.raindropAngleOfAttackAverage.add(
-						this.raindropAngleOfAttackVariance.mul(
-							n1P1(baseSeedIndex.add(3)))
-					)
+
+
 					// determine width
 					const width = this.raindropWidthAverage.add(
 						this.raindropWidthVariance.mul(
-							n1P1(baseSeedIndex.add(4)))
+							n1P1(baseSeedIndex.add(3)))
 					)
 					// determine length
 					const length = this.raindropLengthAverage.add(
 						this.raindropLengthVariance.mul(
-							n1P1(baseSeedIndex.add(5)))
+							n1P1(baseSeedIndex.add(4)))
 					)
 					// determine mass
 					const mass = this.raindropMassAverage.add(
 						this.raindropMassVariance.mul(
+							n1P1(baseSeedIndex.add(5)))
+					)
+
+					// determine yaw
+					const yaw = this.raindropYawAverage.add(
+						this.raindropYawVariance.mul(
 							n1P1(baseSeedIndex.add(6)))
 					)
 
-					// determine horizontal velocity
-					const velocityHorizontal = this.raindropVelocityHorizontalAverage.add(
-						this.raindropVelocityHorizontalVariance.mul(
-							n1P1(baseSeedIndex.add(7))
+					// determine pitch
+					const pitch = this.raindropPitchAverage.add(
+						this.raindropPitchVariance.mul(
+							n1P1(baseSeedIndex.add(7)))
+					)
+
+					// determine horizontal speed
+					const speedHorizontal = this.raindropSpeedHorizontalAverage.add(
+						this.raindropSpeedHorizontalVariance.mul(
+							n1P1(baseSeedIndex.add(8))
 						)
 					)
 
-					// determine vertical
-					const velocityVertical = this.raindropVelocityVerticalAverage.add(
-						this.raindropVelocityVerticalVariance.mul(
-							n1P1(baseSeedIndex.add(8))
+					// determine vertical speed
+					const speedVertical = this.raindropSpeedVerticalAverage.add(
+						this.raindropSpeedVerticalVariance.mul(
+							n1P1(baseSeedIndex.add(9))
 						)
 					).negate()
+
+					// generate a velocity based off of pitch, yaw, horizontal,
+					// and vertical velocity
+					const dir = rotate(
+							rotate(vec3(1, 0, 0), vec3(0, pitch, 0)), 
+							vec3(0, 0, yaw))
+					const vXY = dir.xy.mul(speedHorizontal)
+					const vZ = dir.z.mul(speedVertical).negate()
+					const velocity = vec3(vXY.x, vXY.y, vZ)
 
 					const raindrop = this.raindrops.element(instanceIndex)
 					raindrop.get('position')
 						.assign(vec3(x, y, z))
 					raindrop.get('velocity')
-						.assign(vec3(velocityHorizontal, velocityHorizontal, velocityVertical))
+						.assign(velocity)
 					raindrop.get('width')
 						.assign(width)
 					raindrop.get('length')
 						.assign(length)
-					raindrop.get('angleOfAttack')
-						.assign(alpha)
 					raindrop.get('mass')
 						.assign(mass)
 				})()
@@ -486,20 +505,21 @@
 
 					const raindrop = this.raindrops.element(instanceIndex)
 
-					const posCamSpace = vec4(raindrop.get('position').xyz, 1).mul(this.cameraViewMatrix.transpose())
-
-					const a = posCamSpace.xy
-
+					const pos = raindrop.get('position')
 					// const cameraSpacePos = a.mul(cameraViewMatrix)
 					// construct a 2d vector of length pointing to +x
 					const length = raindrop.get('length')
 					const width = raindrop.get('width')
-					const vToTail = vec2(1, 0).mul(length)
-					// rotate the 2d vector by the angle of attack
-					const alpha = raindrop.get('angleOfAttack')
-					const vToTailPrime = rotate(vToTail, alpha)
-					// const vToTailPrime = vToTail
-					const b = a.add(vToTailPrime)
+					const velocity = raindrop.get('velocity')
+
+					const aPrev = pos
+					const bPrev = pos.add(velocity.negate())
+
+					const a3D = vec4(aPrev, 1).mul(this.cameraViewMatrix.transpose())
+					const b3D = vec4(bPrev, 1).mul(this.cameraViewMatrix.transpose())
+
+					const a = a3D.xy
+					const b = b3D.xy
 
 					//     | <- b
 					//    |
@@ -535,19 +555,19 @@
 					
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(1))
-						.assign(vec4(p1.x, p1.y, posCamSpace.z, posCamSpace.w))
+						.assign(vec4(p1.x, p1.y, a3D.z, a3D.w))
 
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(3))
-						.assign(vec4(p3.x, p3.y, posCamSpace.z, posCamSpace.w))
+						.assign(vec4(p3.x, p3.y, a3D.z, a3D.w))
 
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(0))
-						.assign(vec4(p0.x, p0.y, posCamSpace.z, posCamSpace.w))
+						.assign(vec4(p0.x, p0.y, b3D.z, b3D.w))
 
 					raindropsMeshGeometry
 						.element(instanceIndex.mul(4).add(2))
-						.assign(vec4(p2.x, p2.y, posCamSpace.z, posCamSpace.w))
+						.assign(vec4(p2.x, p2.y, b3D.z, b3D.w))
 					// 4 vertices per vertex index
 				})().compute(this.raindropsN.value)
 
@@ -570,18 +590,8 @@
 					const raindrop = this.raindrops.element(instanceIndex)
 					const position = raindrop.get('position')
 					const velocity = raindrop.get('velocity')
-					const alpha = raindrop.get('angleOfAttack')
-					// proportional to cos angle of attack
-					const rainVelocityX = cos(radians(alpha)).mul(velocity.x)
 
-					const rainVelocityZ = sin(radians(alpha)).mul(velocity.z)
-					// set to 0 for now, could change later
-					const rainVelocityY = 0
-
-					const changeInPos = vec3(
-						rainVelocityX, 
-						rainVelocityY, 
-						rainVelocityZ).mul(this.dtS)
+					const changeInPos = velocity.mul(this.dtS)
 
 					position.addAssign(changeInPos)
 				})().compute(this.raindropsN.value)
