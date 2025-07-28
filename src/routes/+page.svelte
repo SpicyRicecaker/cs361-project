@@ -147,17 +147,10 @@
 		raindropSpeedVerticalVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropYawAverage: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
 		raindropYawVariance: THREE.TSL.ShaderNodeObject<THREE.UniformNode<number>>
+		raindropColor: THREE.TSL.ShaderNodeObject<THREE.UniformNode<THREE.Color>>
+		rainColor: void
 
 		constructor() {
-			// ======================================================
-			// =                                                    =
-			// =                  CREATE GUI                        =
-			// =                                                    =
-			// =                                                    =
-			// ======================================================
-			this.gui = new GUI()
-			this.ticks = 0
-			this.gui.add(this, 'ticks').listen()
 			// ======================================================
 			// =                                                    =
 			// =                  CREATE CAMERA                     =
@@ -283,9 +276,10 @@
 			this.raindropConstGravity = uniform(9.8)
 			this.raindropSpawnHeightAverage = uniform(6) // low for debugging purposes
 			this.raindropSpawnHeightVariance = uniform(3)
+			this.raindropColor = uniform(new THREE.Color(0, 0, 1))
 
-			this.raindropWidthAverage = uniform(0.01)
-			this.raindropWidthVariance = uniform(0.01)
+			this.raindropWidthAverage = uniform(0.001)
+			this.raindropWidthVariance = uniform(0.0001)
 			this.raindropPitchAverage = uniform(-45) // in degrees
 			this.raindropPitchVariance = uniform(1)
 			this.raindropYawAverage = uniform(180) // in degrees
@@ -296,8 +290,8 @@
 			this.raindropSpeedVerticalAverage = uniform(1)
 			this.raindropSpeedVerticalVariance = uniform(0.05)
 
-			this.raindropLengthAverage = uniform(0.1) // in m
-			this.raindropLengthVariance = uniform(0.01)
+			this.raindropLengthAverage = uniform(0.3) // in m
+			this.raindropLengthVariance = uniform(0.1)
 			this.raindropMassAverage = uniform(0.001) // in kg
 			this.raindropMassVariance = uniform(0.0001)
 
@@ -509,11 +503,12 @@
 					// const cameraSpacePos = a.mul(cameraViewMatrix)
 					// construct a 2d vector of length pointing to +x
 					const length = raindrop.get('length')
-					const width = raindrop.get('width')
+					// const width = raindrop.get('width')
+					const width = this.raindropWidthAverage
 					const velocity = raindrop.get('velocity')
 
 					const aPrev = pos
-					const bPrev = pos.add(velocity.negate())
+					const bPrev = pos.add(velocity.normalize().negate().mul(length))
 
 					const a3D = vec4(aPrev, 1).mul(this.cameraViewMatrix.transpose())
 					const b3D = vec4(bPrev, 1).mul(this.cameraViewMatrix.transpose())
@@ -582,7 +577,6 @@
 				})()
 
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
-
 
 				this.dtS = uniform(0)
 				// region rain physics
@@ -672,6 +666,18 @@
 				// 	this.scene.add(this.debugRaindrops2)
 				// }
 			}
+			// region gui
+			// ======================================================
+			// =                                                    =
+			// =                  CREATE GUI                        =
+			// =                                                    =
+			// =                                                    =
+			// ======================================================
+			this.gui = new GUI()
+			this.ticks = 0
+			this.gui.add(this, 'ticks').listen()
+			this.gui.add(this.raindropWidthAverage, 'value', 0, 0.01, 0.001)
+
 			// region gpu
 			this.rawGPUSushiPlate = null
 			this.gpuSushiPlate = instancedArray(3, 'vec3')
