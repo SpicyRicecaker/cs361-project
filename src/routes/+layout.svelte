@@ -40,8 +40,10 @@
 					tentativeEnabledRaindrops = $enabledRaindrops
 				}
 			} else {
+				console.log('setting', $enabledRaindrops, tentativeEnabledRaindrops)
 				$enabledRaindrops = tentativeEnabledRaindrops
 				$game.raindropEnabledN.value = $enabledRaindrops
+				console.log('done, new value', $enabledRaindrops)
 			}
 		}
 	})
@@ -135,6 +137,7 @@
 			date: "1.1.99",
 			time: "1:00 AM",
 			imageData: "Default",
+			enabledRaindrops: 7200,
 			pitch: 0, 
 			yaw: 0,
 			position: new THREE.Vector3(0, 0, 0.5)
