@@ -1,2 +1,2 @@
 import { writable } from 'svelte/store';
-export const game = writable(null);
+export const game: Game = writable(null);

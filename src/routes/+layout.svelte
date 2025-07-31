@@ -1,5 +1,8 @@
 <script lang="ts">
 	import '../app.css';
+	import { game } from '$lib/store';
+	import Polaroid from '$lib/Polaroid.svelte'
+	import * as THREE from "three/webgpu"
 
 	let { children } = $props();
 
@@ -25,12 +28,11 @@
 		1, 2, 3, 4, 0, 0
 	])
 
-	let scene = $state("camera")
+	let scene = $state("album")
 	let inventorySelected = $state(0)
 
 	let qHovered = $state(false)
 	let xHovered = $state(false)
-
 
 	function getDate(date: Date) {
 		return `${date.getMonth() + 1}.${date.getDate()}.${date.getFullYear().toString().slice(-2)} ${date.getHours() > 12 ? date.getHours() - 12 : date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`
@@ -43,9 +45,9 @@
 				name: `photo\n${dateString.slice(-9)}`,
 				data: {
 					dateString: dateString,
-					// pitch: this.player.pitch,
-					// yaw: this.player.yaw,
-					// position: this.player.position
+					pitch: $game.playerPitch,
+					yaw: $game.playerYaw,
+					position: $game.camera.position
 				}
 			})
 			if (inventory[4] == 0) {
@@ -64,6 +66,17 @@
 			scene = 'camera'
 		}
 	}
+
+	const polaroids = $state({
+		0: {
+			fake: false,
+			dateString: "Default",
+			pitch: 0, 
+			yaw: 0,
+			position: new THREE.Vector3(0, 0, 0.5)
+		}
+	})
+
 </script>
 
 <svelte:window on:keydown={(e) => handleKeyDown(e)}></svelte:window>
@@ -87,8 +100,6 @@
 			<div class="w-12 h-4 bg-white absolute left-0 top-0"></div>
 		</div>
 
-
-
 		<div 
 			on:click={() => {scene = 'none'}}
 			class="x w-[5rem] h-[rem] grid text-3xl text-white border-0 hover:border-5 rounded-full aspect-[1/1] select-none hover:cursor-pointer">
@@ -101,7 +112,6 @@
 			<div class="place-self-center text-5xl">?</div>
 		</div>
 		{#if qHovered}
-			<div></div>
 			<div class="i w-full bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99">
 				Welcome to the Camera. <br><br>
 
@@ -112,6 +122,46 @@
 				Press 'esc' to cancel! <br><br>
 			</div>
 		{/if}
+	{:else if scene == 'album'}
+		<div class="i w-full grid grid-cols-2 gap-1">
+			<div
+				class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 gap-3"
+			>
+				{#each Array(4).fill().map((_, i) => i in polaroids ? polaroids[i] : {fake: true} ) as polaroid, idx}
+					{#if !polaroid.fake}
+						<Polaroid d={polaroid} loadScene={(d) => {
+							$game.camera.position.setX(d.position.x)
+							$game.camera.position.setY(d.position.y)
+							$game.camera.position.setZ(d.position.z)
+							$game.playerYaw = d.yaw
+							$game.playerPitch = d.pitch
+						}}
+						/>
+					{:else}
+						<div class="bg-black">drag here</div>
+					{/if}
+				{/each}
+			</div>
+			<div
+				class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 gap-3"
+			>
+
+				{#each Array(4).fill().map((_, i) => (i+4) in polaroids ? polaroids[i + 4] : {fake: true} ) as polaroid, idx}
+					{#if !polaroid.fake}
+						<Polaroid d={polaroid} loadScene={(d) => {
+							$game.camera.position.setX(d.position.x)
+							$game.camera.position.setY(d.position.y)
+							$game.camera.position.setZ(d.position.z)
+							$game.playerYaw = d.yaw
+							$game.playerPitch = d.pitch
+						}}
+						/>
+					{:else}
+						<div class="bg-black">drag here</div>
+					{/if}
+				{/each}
+			</div>
+		</div>
 	{/if}
 
 	{#if scene !== 'camera'}

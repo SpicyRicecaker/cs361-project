@@ -1,4 +1,6 @@
 <script lang="ts">
+	import {game} from "$lib/store"
+
 	import { onMount } from 'svelte'
 	// script.js
 	import * as THREE from 'three/webgpu'
@@ -1350,9 +1352,8 @@
 
 	const mRadians = (deg: number) => (deg * Math.PI) / 180
 
-	let game: Game | null = null
 	onMount(async () => {
-		game = new Game()
-		await game.init()
+		game.set(new Game())
+		await $game.init()
 	})
 </script>
