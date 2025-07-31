@@ -1,10 +1,16 @@
 <script lang="ts">
 	import '../app.css';
-	import { game } from '$lib/store';
+	import { game, noAction, sleep } from '$lib/store';
 	import Polaroid from '$lib/Polaroid.svelte'
 	import * as THREE from "three/webgpu"
+	import { tick } from 'svelte'
+	import Drag from '$lib/Drop.svelte'
 
 	let { children } = $props();
+
+	const addScene = (dataBaseItemID, i) => {
+		polaroids[i] = database[dataBaseItemID].data
+	}
 
 	const database = $state([
 		{
@@ -47,7 +53,8 @@
 					dateString: dateString,
 					pitch: $game.playerPitch,
 					yaw: $game.playerYaw,
-					position: $game.camera.position
+					position: $game.camera.position.clone(),
+					fake: false
 				}
 			})
 			if (inventory[4] == 0) {
@@ -75,6 +82,18 @@
 			yaw: 0,
 			position: new THREE.Vector3(0, 0, 0.5)
 		}
+	})
+
+	const polaroidsReadable = $derived(
+		Array(8)
+			.fill()
+			.map((_, i) => i in polaroids 
+				? polaroids[i]
+				: {fake: true}
+	))
+
+	$effect(() => {
+		$inspect(polaroidsReadable)
 	})
 
 </script>
@@ -124,44 +143,27 @@
 		{/if}
 	{:else if scene == 'album'}
 		<div class="i w-full grid grid-cols-2 gap-1">
-			<div
-				class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 gap-3"
-			>
-				{#each Array(4).fill().map((_, i) => i in polaroids ? polaroids[i] : {fake: true} ) as polaroid, idx}
-					{#if !polaroid.fake}
-						<Polaroid d={polaroid} loadScene={(d) => {
-							$game.camera.position.setX(d.position.x)
-							$game.camera.position.setY(d.position.y)
-							$game.camera.position.setZ(d.position.z)
-							$game.playerYaw = d.yaw
-							$game.playerPitch = d.pitch
-						}}
-						/>
-					{:else}
-						<div class="bg-black">drag here</div>
-					{/if}
-				{/each}
-			</div>
-			<div
-				class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 gap-3"
-			>
-
-				{#each Array(4).fill().map((_, i) => (i+4) in polaroids ? polaroids[i + 4] : {fake: true} ) as polaroid, idx}
-					{#if !polaroid.fake}
-						<Polaroid d={polaroid} loadScene={(d) => {
-							$game.camera.position.setX(d.position.x)
-							$game.camera.position.setY(d.position.y)
-							$game.camera.position.setZ(d.position.z)
-							$game.playerYaw = d.yaw
-							$game.playerPitch = d.pitch
-						}}
-						/>
-					{:else}
-						<div class="bg-black">drag here</div>
-					{/if}
-				{/each}
-			</div>
-		</div>
+			{#each {length: 2}, albumPage}
+				<div
+					class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 gap-3"
+				>
+					{#each polaroidsReadable.slice(albumPage * 4, (albumPage + 1) * 4) as polaroid, i}
+						{#if !polaroid.fake}
+							<Polaroid d={polaroid} loadScene={(d) => {
+								$game.camera.position.setX(d.position.x)
+								$game.camera.position.setY(d.position.y)
+								$game.camera.position.setZ(d.position.z)
+								$game.playerYaw = d.yaw
+								$game.playerPitch = d.pitch
+							}}
+							/>
+						{:else}
+							<Drag i={i + albumPage * 4} addScene={addScene}></Drag>
+						{/if}
+					{/each}
+				</div>
+			{/each}
+	</div>
 	{/if}
 
 	{#if scene !== 'camera'}
@@ -171,14 +173,28 @@
 					{#if databaseItemID === 0}
 						<div class="bg-white aspect-[1/1] w-[1rem] place-self-center rotate-45"></div>
 				{:else}
-						<div class={`flex-1 grid border border-white ${inventorySelected == idx ? 'border-3' : ''} rotate-45 aspect-[1/1] border-5 w-[5rem] hover:bg-white hover:cursor-pointer hover:text-black`} on:click={() => {
+						<div 
+							draggable={true} 
+							
+							on:dragstart={(e) => {
+								if (idx == 4 || idx == 5) {
+									// e.dataTransfer.setData("text/plain", JSON.stringify(inventory[idx].data))
+									e.dataTransfer.setData("text/plain", `${databaseItemID}`)
+									e.dataTransfer.effectAllowed = "move";
+								}
+							}}
+							
+							class={`flex-1 grid border border-white ${inventorySelected == idx ? 'border-3' : ''} rotate-45 aspect-[1/1] border-5 w-[5rem] hover:bg-white hover:cursor-pointer hover:text-black`} 
+							
+							on:mousedown={(e) => {
 							const name = database[databaseItemID].name
 							if (name !== ''
 								&& !name.includes('photo')
 							) {
 								scene = database[databaseItemID].name
-							}
-						}}>
+							}}}
+							>
+
 							<div class="place-self-center -rotate-45 whitespace-pre-line">{database[databaseItemID].name}</div>
 						</div>
 					{/if}

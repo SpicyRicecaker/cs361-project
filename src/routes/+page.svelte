@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {game} from "$lib/store"
+	import {game, noAction} from "$lib/store"
 
 	import { onMount } from 'svelte'
 	// script.js
@@ -1186,6 +1186,9 @@
 		}
 
 		handleMouseMove = (e: MouseEvent) => {
+			if ($noAction) {
+				return
+			}
 			const pitchYawConversionFactor = 0.2
 			if (this.inputMouseDown) {
 				this.playerPitch = mClamp(

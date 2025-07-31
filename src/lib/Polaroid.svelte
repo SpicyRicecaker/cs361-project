@@ -9,6 +9,7 @@
     <div 
         on:click={(e) => { loadScene(d)}}
         class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 hover:cursor-pointer hover:bg-white">
+        pic
     </div>
-    <div class="text-white">{d.dateString}</div>
+    <div class="text-white text-xl">{d.dateString}</div>
 </div>
