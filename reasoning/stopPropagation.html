@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <button id="button">trigger button</button>
+    <script>
+        document.getElementById('button').addEventListener('mousedown', (e) => {
+            e.stopPropagation()
+            console.log('button clicked')
+        })
+        window.addEventListener('mousedown', (e) => {
+            console.log('trying not to get this to print')
+        })
+    </script>
+</body>
+</html>

@@ -41,20 +41,26 @@
 	let xHovered = $state(false)
 
 	function getDate(date: Date) {
-		return `${date.getMonth() + 1}.${date.getDate()}.${date.getFullYear().toString().slice(-2)} ${date.getHours() > 12 ? date.getHours() - 12 : date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`
+		return [`${date.getMonth() + 1}.${date.getDate()}.${date.getFullYear().toString().slice(-2)}`, `${date.getHours() > 12 ? date.getHours() - 12 : date.getHours()}:${date.getMinutes().toString().padStart(2, '0')} ${date.getHours() >= 12 ? 'PM' : 'AM'}`]
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
 		switch (e.code) {
 			case 'KeyF': {
-				const dateString = getDate(new Date())
+				if ($scene != 'camera') {
+					return
+				}
+				const [date, time] = getDate(new Date())
+				const imageData = $game.renderer.domElement.toDataURL('image/jpeg')
 				database.push({
-					name: `photo\n${dateString.slice(-9)}`,
+					name: `photo\n${time}`,
 					data: {
-						dateString: dateString,
+						date: date,
+						time: time,
 						pitch: $game.playerPitch,
 						yaw: $game.playerYaw,
 						position: $game.camera.position.clone(),
+						imageData: imageData,
 						fake: false
 					}
 				})
@@ -89,7 +95,9 @@
 	const polaroids = $state({
 		0: {
 			fake: false,
-			dateString: "Default",
+			date: "1.1.99",
+			time: "1:00 AM",
+			imageData: "Default",
 			pitch: 0, 
 			yaw: 0,
 			position: new THREE.Vector3(0, 0, 0.5)
@@ -186,7 +194,15 @@
 				{:else}
 						<div 
 							draggable={true} 
-							
+							on:mousedown={(e) =>{ 
+								e.stopPropagation()
+								const name = database[databaseItemID].name
+								if (name !== ''
+									&& !name.includes('photo')
+								) {
+									$scene = database[databaseItemID].name
+								}
+							}}
 							on:dragstart={(e) => {
 								if (idx == 4 || idx == 5) {
 									// e.dataTransfer.setData("text/plain", JSON.stringify(inventory[idx].data))
@@ -194,17 +210,8 @@
 									e.dataTransfer.effectAllowed = "move";
 								}
 							}}
-							
 							class={`flex-1 grid border border-white ${inventorySelected == idx ? 'border-3' : ''} rotate-45 aspect-[1/1] border-5 w-[5rem] hover:bg-white hover:cursor-pointer hover:text-black`} 
-							
-							on:mousedown={(e) => {
-							const name = database[databaseItemID].name
-							if (name !== ''
-								&& !name.includes('photo')
-							) {
-								$scene = database[databaseItemID].name
-							}}}
-							>
+						>
 
 							<div class="place-self-center -rotate-45 whitespace-pre-line">{database[databaseItemID].name}</div>
 						</div>

@@ -1186,9 +1186,6 @@
 		}
 
 		handleMouseMove = (e: MouseEvent) => {
-			if ($noAction) {
-				return
-			}
 			const pitchYawConversionFactor = 0.2
 			if (this.inputMouseDown) {
 				this.playerPitch = mClamp(

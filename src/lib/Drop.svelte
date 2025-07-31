@@ -4,7 +4,9 @@
 </script>
 
 <div 
-    class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none grid grid-cols-2 grid-rows-2 hover:cursor-pointer hover:bg-white"
+    class="bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99 select-none hover:cursor-pointer hover:bg-white grid
+    hover:text-black
+    "
 
     on:dragover={(e) => {
         e.preventDefault()
@@ -17,4 +19,5 @@
         addScene(dataBaseItemID, i)
     }}
     >
+        <div class="place-self-center">+</div>
 </div>

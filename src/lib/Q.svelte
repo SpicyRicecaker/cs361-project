@@ -10,7 +10,7 @@
     <div class="place-self-center text-5xl">?</div>
 </div>
 {#if qHovered}
-    <div class="i w-full bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99">
+    <div class="i w-full bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-101">
         <slot></slot>
     </div>
 {/if}
