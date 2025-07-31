@@ -216,7 +216,7 @@
 								$game.camera.position.setZ(d.position.z)
 								$game.playerYaw = d.yaw
 								$game.playerPitch = d.pitch
-								$enabledRaindrops = d.enabledRaindrops
+								tentativeEnabledRaindrops = d.enabledRaindrops
 							}}
 							/>
 						{:else}
