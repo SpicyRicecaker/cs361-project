@@ -14,3 +14,21 @@ body > div {
     width: 100vw;
     height: 100vh;
 }
+
+.inventory {
+    grid-column-start: content-start;
+    grid-row-start: content-end;
+    grid-row-end: main-end;
+}
+
+.q {
+    grid-column-start: content-end;
+    grid-row-start: main-start;
+    grid-row-end: content-start;
+}
+
+.i {
+    grid-column-start: content-start;
+    grid-row-start: content-start;
+    grid-row-end: content-end;
+}

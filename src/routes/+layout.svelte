@@ -1,10 +1,12 @@
 <script lang="ts">
 	import '../app.css';
-	import { game, noAction, sleep } from '$lib/store';
+	import { game, noAction, sleep, scene } from '$lib/store';
 	import Polaroid from '$lib/Polaroid.svelte'
 	import * as THREE from "three/webgpu"
 	import { tick } from 'svelte'
 	import Drag from '$lib/Drop.svelte'
+	import X from '$lib/X.svelte'
+	import Q from '$lib/Q.svelte'
 
 	let { children } = $props();
 
@@ -34,10 +36,8 @@
 		1, 2, 3, 4, 0, 0
 	])
 
-	let scene = $state("album")
 	let inventorySelected = $state(0)
 
-	let qHovered = $state(false)
 	let xHovered = $state(false)
 
 	function getDate(date: Date) {
@@ -45,32 +45,44 @@
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
-		if (e.code == 'KeyF') {
-			const dateString = getDate(new Date())
-			database.push({
-				name: `photo\n${dateString.slice(-9)}`,
-				data: {
-					dateString: dateString,
-					pitch: $game.playerPitch,
-					yaw: $game.playerYaw,
-					position: $game.camera.position.clone(),
-					fake: false
+		switch (e.code) {
+			case 'KeyF': {
+				const dateString = getDate(new Date())
+				database.push({
+					name: `photo\n${dateString.slice(-9)}`,
+					data: {
+						dateString: dateString,
+						pitch: $game.playerPitch,
+						yaw: $game.playerYaw,
+						position: $game.camera.position.clone(),
+						fake: false
+					}
+				})
+				if (inventory[4] == 0) {
+					inventory[4] = database.length - 1
+				} else if(inventory[5] == 0) {
+					inventory[5] = database.length - 1
+				} else {
+					const t = inventory[4]
+					inventory[4] = database.length - 1
+					inventory[5] = t
 				}
-			})
-			if (inventory[4] == 0) {
-				inventory[4] = database.length - 1
-			} else if(inventory[5] == 0) {
-				inventory[5] = database.length - 1
-			} else {
-				const t = inventory[4]
-				inventory[4] = database.length - 1
-				inventory[5] = t
+				// determine if we can replace current database with 
+				$scene = 'none'
+				break
 			}
-			// determine if we can replace current database with 
-			scene = 'none'
-		}
-		if (e.code == 'Digit1') {
-			scene = 'camera'
+			case 'Digit1': {
+				$scene = 'camera'
+				break
+			}
+			case 'Digit4': {
+				$scene = 'album'
+				break
+			}
+			case 'Escape': {
+				$scene = 'none'
+				break
+			}
 		}
 	}
 
@@ -103,8 +115,8 @@
 <div class="wrapper p-8 relative">
 	{@render children()}
 
-	{#if scene === 'none'}
-	{:else if scene === 'camera'}
+	{#if $scene === 'none'}
+	{:else if $scene === 'camera'}
 		<div class="select-none l-shape w-32 h-32 absolute top-[calc(50%-1.2rem)] left-[calc(50%-1.2rem)]">
 			<!-- Vertical part of L -->
 			<div class="w-4 h-12 bg-white absolute left-0 top-0"></div>
@@ -119,29 +131,28 @@
 			<div class="w-12 h-4 bg-white absolute left-0 top-0"></div>
 		</div>
 
-		<div 
-			on:click={() => {scene = 'none'}}
-			class="x w-[5rem] h-[rem] grid text-3xl text-white border-0 hover:border-5 rounded-full aspect-[1/1] select-none hover:cursor-pointer">
-			<div class="place-self-center text-5xl">x</div>
-		</div>
-		<div 
-			on:mouseenter={() => {qHovered = true}}
-			on:mouseleave={() => {qHovered = false}}
-			class="q w-[5rem] h-[rem] grid text-3xl text-white border-0 hover:border-5 rounded-full aspect-[1/1] select-none hover:cursor-pointer">
-			<div class="place-self-center text-5xl">?</div>
-		</div>
-		{#if qHovered}
-			<div class="i w-full bg-black p-9 text-3xl border-4 h-[80%] border-white border-solid text-white z-99">
-				Welcome to the Camera. <br><br>
+		<Q>
+			Welcome to the Camera. <br><br>
 
-				Press 'alt' to show the mouse! <br><br>
+			Press 'alt' to show the mouse! <br><br>
 
-				'f' to take a picture! <br><br>
+			'f' to take a picture! <br><br>
 
-				Press 'esc' to cancel! <br><br>
-			</div>
-		{/if}
-	{:else if scene == 'album'}
+			Press 'esc' to cancel! <br><br>
+		</Q>
+		<X/>
+	{:else if $scene == 'album'}
+		<Q>
+			Welcome to the Album. <br><br>
+
+			Press 'alt' to show the mouse! <br><br>
+
+			Drag and drop your polaroids (5 & 6) <br><br>
+
+			Press 'esc' to cancel! <br><br>
+		</Q>
+		<X/>
+
 		<div class="i w-full grid grid-cols-2 gap-1">
 			{#each {length: 2}, albumPage}
 				<div
@@ -166,7 +177,7 @@
 	</div>
 	{/if}
 
-	{#if scene !== 'camera'}
+	{#if $scene !== 'camera'}
 		<div class="text-white inventory flex gap-20 select-none">
 			{#each inventory as databaseItemID, idx}
 				<div class="grid gap-1 grid-rows-[50%_50%]">
@@ -191,7 +202,7 @@
 							if (name !== ''
 								&& !name.includes('photo')
 							) {
-								scene = database[databaseItemID].name
+								$scene = database[databaseItemID].name
 							}}}
 							>
 
@@ -228,27 +239,4 @@
 		grid-template-rows: [main-start] 1fr [content-start] 5fr [content-end] 1fr [main-end];
 	}
 
-	.x {
-		grid-column-start: main-start;
-		grid-row-start: main-start;
-		grid-row-end: content-start;
-	}
-
-	.q {
-		grid-column-start: content-end;
-		grid-row-start: main-start;
-		grid-row-end: content-start;
-	}
-
-	.i {
-		grid-column-start: content-start;
-		grid-row-start: content-start;
-		grid-row-end: content-end;
-	}
-
-	.inventory {
-		grid-column-start: content-start;
-		grid-row-start: content-end;
-		grid-row-end: main-end;
-	}
 </style>
