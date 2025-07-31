@@ -81,6 +81,10 @@
 				$scene = 'camera'
 				break
 			}
+			case 'Digit3': {
+				$scene = 'umbrella'
+				break
+			}
 			case 'Digit4': {
 				$scene = 'album'
 				break
@@ -182,7 +186,10 @@
 					{/each}
 				</div>
 			{/each}
-	</div>
+		</div>
+	{:else if $scene == 'umbrella'}
+		<Q></Q>
+		<X></X>
 	{/if}
 
 	{#if $scene !== 'camera'}
@@ -210,9 +217,11 @@
 									e.dataTransfer.effectAllowed = "move";
 								}
 							}}
-							class={`flex-1 grid border border-white ${inventorySelected == idx ? 'border-3' : ''} rotate-45 aspect-[1/1] border-5 w-[5rem] hover:bg-white hover:cursor-pointer hover:text-black`} 
+							class={`flex-1 grid border border-white ${inventorySelected == idx ? 'border-3' : ''} rotate-45 aspect-[1/1] border-5 w-[5rem] hover:bg-white hover:cursor-pointer hover:text-black relative`} 
 						>
-
+							{#if database[databaseItemID].name === $scene}
+								<div class="absolute -top-2 -left-2 border border-white border-5 w-[calc(100%+1rem)] h-[calc(100%+1rem)] rotate-45"></div>
+							{/if}
 							<div class="place-self-center -rotate-45 whitespace-pre-line">{database[databaseItemID].name}</div>
 						</div>
 					{/if}
