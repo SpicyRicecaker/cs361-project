@@ -17,17 +17,32 @@
 
 	let enabledRaindropsMin = 0
 	let enabledRaindropsMax = $state(0)
+	let tentativeEnabledRaindrops = $state(0)
+	let volumeWarningShown = $state(false)
 
 	$effect(() => {
 		if ($gameLoaded && enabledRaindropsMax == 0) {
 			enabledRaindropsMax = $game.raindropsN.value
 			$enabledRaindrops = $game.raindropEnabledN.value
+			tentativeEnabledRaindrops = $enabledRaindrops
 		}
 	})
 
 	$effect(() => {
 		if ($gameLoaded) {
-			$game.raindropEnabledN.value = $enabledRaindrops
+			const prog = tentativeEnabledRaindrops / enabledRaindropsMax
+			if (prog > 0.9 && !volumeWarningShown) {
+				if (confirm('Warning! Increasing raindrops above 90% may impact performance and increase volume! Click `ok` to proceed.')) {
+					$enabledRaindrops = tentativeEnabledRaindrops
+					$game.raindropEnabledN.value = $enabledRaindrops
+					volumeWarningShown = true
+				} else {
+					tentativeEnabledRaindrops = $enabledRaindrops
+				}
+			} else {
+				$enabledRaindrops = tentativeEnabledRaindrops
+				$game.raindropEnabledN.value = $enabledRaindrops
+			}
 		}
 	})
 
@@ -224,7 +239,7 @@
 		<div class="i h-[80%] flex w-full items-center gap-4 rounded-lg bg-neutral-900 p-4 bg-transparent">
 			<input
 				type="range"
-				bind:value={$enabledRaindrops}
+				bind:value={tentativeEnabledRaindrops}
 				min={enabledRaindropsMin}
 				max={enabledRaindropsMax}
 				style="--p: {$enabledRaindrops}%"
