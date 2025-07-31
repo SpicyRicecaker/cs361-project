@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { game, sleep, scene, gameLoaded } from '$lib/store';
+	import { game, sleep, scene, gameLoaded, enabledRaindrops } from '$lib/store';
 	import Polaroid from '$lib/Polaroid.svelte'
 	import * as THREE from "three/webgpu"
 	import { tick } from 'svelte'
@@ -8,26 +8,26 @@
 	import X from '$lib/X.svelte'
 	import Q from '$lib/Q.svelte'
 
+
 	let { children } = $props();
 
 	const addScene = (dataBaseItemID, i) => {
 		polaroids[i] = database[dataBaseItemID].data
 	}
 
-	let enabledRaindrops = $state(0)
 	let enabledRaindropsMin = 0
 	let enabledRaindropsMax = $state(0)
 
 	$effect(() => {
 		if ($gameLoaded && enabledRaindropsMax == 0) {
 			enabledRaindropsMax = $game.raindropsN.value
-			enabledRaindrops = $game.raindropEnabledN.value
+			$enabledRaindrops = $game.raindropEnabledN.value
 		}
 	})
 
 	$effect(() => {
 		if ($gameLoaded) {
-			$game.raindropEnabledN.value = enabledRaindrops
+			$game.raindropEnabledN.value = $enabledRaindrops
 		}
 	})
 
@@ -78,7 +78,7 @@
 						yaw: $game.playerYaw,
 						position: $game.camera.position.clone(),
 						imageData: imageData,
-						enabledRaindrops: enabledRaindrops,
+						enabledRaindrops: $enabledRaindrops,
 						fake: false
 					}
 				})
@@ -201,7 +201,7 @@
 								$game.camera.position.setZ(d.position.z)
 								$game.playerYaw = d.yaw
 								$game.playerPitch = d.pitch
-								enabledRaindrops = d.enabledRaindrops
+								$enabledRaindrops = d.enabledRaindrops
 							}}
 							/>
 						{:else}
@@ -224,10 +224,10 @@
 		<div class="i h-[80%] flex w-full items-center gap-4 rounded-lg bg-neutral-900 p-4 bg-transparent">
 			<input
 				type="range"
-				bind:value={enabledRaindrops}
+				bind:value={$enabledRaindrops}
 				min={enabledRaindropsMin}
 				max={enabledRaindropsMax}
-				style="--p: {enabledRaindrops}%"
+				style="--p: {$enabledRaindrops}%"
 				on:mousedown={(e) => {e.stopPropagation()}}
 				class="
 				h-2 w-full cursor-pointer appearance-none border border-white
@@ -255,7 +255,7 @@
 				[&::-moz-range-thumb]:bg-black
 				"
 			/>
-			<span class="w-8 text-right font-mono text-white">{enabledRaindrops}</span>
+			<span class="w-8 text-right font-mono text-white">{$enabledRaindrops}</span>
 		</div>
 		<X></X>
 	{/if}

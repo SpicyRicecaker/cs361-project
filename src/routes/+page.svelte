@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {game, gameLoaded } from "$lib/store"
+	import {enabledRaindrops, game, gameLoaded } from "$lib/store"
 
 	import { onMount } from 'svelte'
 	// script.js
@@ -66,6 +66,14 @@
 		wgslFn
 	} from 'three/tsl'
 	import { lightPosition, positionGeometry } from 'three/src/nodes/TSL.js'
+
+	let audioPlayer;
+	let audioIsPlaying = $state(false)
+	$effect(() => {
+		if (audioPlayer && $game) {
+			audioPlayer.volume = $enabledRaindrops / $game.raindropsN.value
+		}
+	})
 
 	class Game {
 		camera: THREE.PerspectiveCamera
@@ -1183,6 +1191,10 @@
 
 		handleMouseDown = (e: MouseEvent) => {
 			this.inputMouseDown = true
+			if (!audioIsPlaying) {
+				audioPlayer.play()
+				audioIsPlaying = true
+			}
 		}
 
 		handleMouseMove = (e: MouseEvent) => {
@@ -1358,3 +1370,7 @@
 		$gameLoaded = true
 	})
 </script>
+
+
+
+<audio src="/rain-sound.mp3" loop bind:this={audioPlayer} />
