@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { game, noAction, sleep, scene } from '$lib/store';
+	import { game, sleep, scene, gameLoaded } from '$lib/store';
 	import Polaroid from '$lib/Polaroid.svelte'
 	import * as THREE from "three/webgpu"
 	import { tick } from 'svelte'
@@ -13,6 +13,23 @@
 	const addScene = (dataBaseItemID, i) => {
 		polaroids[i] = database[dataBaseItemID].data
 	}
+
+	let enabledRaindrops = $state(0)
+	let enabledRaindropsMin = 0
+	let enabledRaindropsMax = $state(0)
+
+	$effect(() => {
+		if ($gameLoaded && enabledRaindropsMax == 0) {
+			enabledRaindropsMax = $game.raindropsN.value
+			enabledRaindrops = $game.raindropEnabledN.value
+		}
+	})
+
+	$effect(() => {
+		if ($gameLoaded) {
+			$game.raindropEnabledN.value = enabledRaindrops
+		}
+	})
 
 	const database = $state([
 		{
@@ -61,6 +78,7 @@
 						yaw: $game.playerYaw,
 						position: $game.camera.position.clone(),
 						imageData: imageData,
+						enabledRaindrops: enabledRaindrops,
 						fake: false
 					}
 				})
@@ -178,6 +196,7 @@
 								$game.camera.position.setZ(d.position.z)
 								$game.playerYaw = d.yaw
 								$game.playerPitch = d.pitch
+								enabledRaindrops = d.enabledRaindrops
 							}}
 							/>
 						{:else}
@@ -189,6 +208,42 @@
 		</div>
 	{:else if $scene == 'umbrella'}
 		<Q></Q>
+		<div class="i h-[80%] flex w-full items-center gap-4 rounded-lg bg-neutral-900 p-4 bg-transparent">
+			<input
+				type="range"
+				bind:value={enabledRaindrops}
+				min={enabledRaindropsMin}
+				max={enabledRaindropsMax}
+				style="--p: {enabledRaindrops}%"
+				on:mousedown={(e) => {e.stopPropagation()}}
+				class="
+				h-2 w-full cursor-pointer appearance-none border border-white
+				
+				bg-[linear-gradient(to_right,theme(colors.white)_var(--p),theme(colors.black)_var(--p))]
+
+				[&::-webkit-slider-thumb]:h-5
+				[&::-webkit-slider-thumb]:w-5
+				[&::-webkit-slider-thumb]:appearance-none
+				[&::-webkit-slider-thumb]:border-2
+				[&::-webkit-slider-thumb]:border-white
+				[&::-webkit-slider-thumb]:bg-black
+
+				[&::-moz-range-track]:border-white
+				[&::-moz-range-track]:bg-black
+				
+				[&::-moz-range-progress]:bg-white
+				
+				[&::-moz-range-thumb]:h-5
+				[&::-moz-range-thumb]:w-5
+				[&::-moz-range-thumb]:appearance-none
+				[&::-moz-range-thumb]:rounded-none
+				[&::-moz-range-thumb]:border-2
+				[&::-moz-range-thumb]:border-white
+				[&::-moz-range-thumb]:bg-black
+				"
+			/>
+			<span class="w-8 text-right font-mono text-white">{enabledRaindrops}</span>
+		</div>
 		<X></X>
 	{/if}
 

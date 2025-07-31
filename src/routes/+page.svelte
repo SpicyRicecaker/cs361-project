@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {game, noAction} from "$lib/store"
+	import {game, gameLoaded } from "$lib/store"
 
 	import { onMount } from 'svelte'
 	// script.js
@@ -1355,5 +1355,6 @@
 	onMount(async () => {
 		game.set(new Game())
 		await $game.init()
+		$gameLoaded = true
 	})
 </script>
