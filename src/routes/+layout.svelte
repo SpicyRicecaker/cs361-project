@@ -134,10 +134,6 @@
 				: {fake: true}
 	))
 
-	$effect(() => {
-		$inspect(polaroidsReadable)
-	})
-
 </script>
 
 <svelte:window on:keydown={(e) => handleKeyDown(e)}></svelte:window>
@@ -146,6 +142,13 @@
 	{@render children()}
 
 	{#if $scene === 'none'}
+		<Q>
+			WASD to move around! <br><br>
+
+			Press 'space' to move up! <br><br>
+
+			Press 'shift' to move down! <br><br>
+		</Q>
 	{:else if $scene === 'camera'}
 		<div class="select-none l-shape w-32 h-32 absolute top-[calc(50%-1.2rem)] left-[calc(50%-1.2rem)]">
 			<!-- Vertical part of L -->
@@ -175,9 +178,11 @@
 		<Q>
 			Welcome to the Album. <br><br>
 
-			Press 'alt' to show the mouse! <br><br>
+			First take a picture with the Camera! <br><br>
 
-			Drag and drop your polaroids (5 & 6) <br><br>
+			Then drag and drop your polaroids (5 & 6) into the slots here! <br><br>
+
+			Press 'alt' to show the mouse! <br><br>
 
 			Press 'esc' to cancel! <br><br>
 		</Q>
@@ -207,7 +212,15 @@
 			{/each}
 		</div>
 	{:else if $scene == 'umbrella'}
-		<Q></Q>
+		<Q>
+			This is the umbrella!<br><br>
+
+			Slide to change the amount of rain that falls! <br><br>
+
+			Press 'alt' to show the cursor! <br><br>
+			
+			More rain may look more visually pleasing, but may impact performance. <br><br>
+		</Q>
 		<div class="i h-[80%] flex w-full items-center gap-4 rounded-lg bg-neutral-900 p-4 bg-transparent">
 			<input
 				type="range"

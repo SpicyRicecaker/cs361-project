@@ -199,8 +199,8 @@
 			// Set the renderer's pixel ratio.
 			// TODO device pixel ratio for some reason makes the canvas a little bigger
 			// this.renderer.setPixelRatio(window.devicePixelRatio)
-			console.log(window.innerWidth, window.innerHeight)
-			console.log(window.devicePixelRatio)
+			// console.log(window.innerWidth, window.innerHeight)
+			// console.log(window.devicePixelRatio)
 			// Set size of the renderer to cover the full size of the window.
 			this.renderer.setSize(window.innerWidth, window.innerHeight)
 			// cleanup old renderers
