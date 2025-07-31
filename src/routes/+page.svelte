@@ -195,12 +195,17 @@
 			// ======================================================
 			this.renderer = new THREE.WebGPURenderer({ antialias: false })
 			// Set the renderer's pixel ratio.
-			this.renderer.setPixelRatio(window.devicePixelRatio)
+			// TODO device pixel ratio for some reason makes the canvas a little bigger
+			// this.renderer.setPixelRatio(window.devicePixelRatio)
+			console.log(window.innerWidth, window.innerHeight)
+			console.log(window.devicePixelRatio)
 			// Set size of the renderer to cover the full size of the window.
 			this.renderer.setSize(window.innerWidth, window.innerHeight)
 			// cleanup old renderers
 			this.renderer.domElement.id = 'renderer'
+			this.renderer.domElement.style = "position: absolute; top: 0; left: 0; z-index: -1;"
 			document.getElementById('renderer')?.remove()
+			document.body.style = "position: relative"
 			document.body.appendChild(this.renderer.domElement)
 			// add controls
 			{
@@ -292,7 +297,7 @@
 			// ======================================================
 			this.raindropsDebugNSqrt = uniform(120)
 			this.raindropsN = uniform(this.raindropsDebugNSqrt.value * this.raindropsDebugNSqrt.value)
-			this.raindropEnabledN = uniform(this.raindropsN.value)
+			this.raindropEnabledN = uniform(this.raindropsN.value / 2)
 			this.raindropConstHeightGround = uniform(0.0)
 			this.raindropConstGravity = uniform(9.8)
 			this.raindropSpawnHeightAverage = uniform(5) // low for debugging purposes
@@ -1037,7 +1042,7 @@
 					// return distance.mul(color(1, 1, 1))
 					// return wavelet.get('innerRadius').mul(color(1, 1, 1))
 					// return wavelet.get('outerRadius').mul(color(1, 1, 1))
-					return waveletsDepthInterpolators.mul(color(1, 1, 1).mul(0.7))
+					return waveletsDepthInterpolators.mul(color(1, 1, 1).mul(0.6))
 				})()
 
 				// region wavelet physics
@@ -1145,13 +1150,13 @@
 			// =                                                    =
 			// =                                                    =
 			// ======================================================
-			this.gui = new GUI()
-			this.ticks = 0
-			this.gui.add(this, 'ticks').listen()
-			this.gui.add(this.raindropWidthAverage, 'value', 0, 0.01, 0.001)
-			this.paused = false
-			this.gui.add(this, 'paused').listen()
-			this.gui.add(this.raindropEnabledN, 'value', 0, this.raindropsN.value, 1)
+			// this.gui = new GUI()
+			// this.ticks = 0
+			// this.gui.add(this, 'ticks').listen()
+			// this.gui.add(this.raindropWidthAverage, 'value', 0, 0.01, 0.001)
+			// this.paused = false
+			// this.gui.add(this, 'paused').listen()
+			// this.gui.add(this.raindropEnabledN, 'value', 0, this.raindropsN.value, 1)
 
 			// region gpu
 			this.rawGPUSushiPlate = null
@@ -1234,9 +1239,9 @@
 					Object.entries(this.inputEventToListenerList).forEach(([v, k]) =>
 						(window as any).removeEventListener(v, k)
 					)
-					// this.renderer.setAnimationLoop(() => {})
+					this.renderer.setAnimationLoop(() => {})
 					this.renderer.dispose()
-					this.gui.destroy()
+					// this.gui.destroy()
 				})
 			}
 		}
