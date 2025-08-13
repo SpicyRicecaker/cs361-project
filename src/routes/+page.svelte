@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {enabledRaindrops, game, gameLoaded } from "$lib/store"
+	import {enabledRaindrops, game, gameLoaded, wind_speed, uv_index } from "$lib/store"
 
 	import { onMount } from 'svelte'
 	// script.js
@@ -72,6 +72,20 @@
 	$effect(() => {
 		if (audioPlayer && $game) {
 			audioPlayer.volume = $enabledRaindrops / $game.raindropsN.value
+		}
+	})
+
+	$effect(() => {
+		if ($gameLoaded === true) {
+			$game.raindropSpeedHorizontalAverage.value *= (.95 + .05 * ($wind_speed / 20))
+		}
+	})
+
+	$effect(() => {
+		if ($gameLoaded === true) {
+			const t = ($uv_index / 10)
+			const v = 0 + 0.1 * t
+			$game.scene.background = new THREE.Color(v, v, v)
 		}
 	})
 

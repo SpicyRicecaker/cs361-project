@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { game, sleep, scene, gameLoaded, enabledRaindrops } from '$lib/store';
+	import { game, sleep, scene, gameLoaded, enabledRaindrops, wind_speed, uv_index } from '$lib/store';
 	import Polaroid from '$lib/Polaroid.svelte'
 	import * as THREE from "three/webgpu"
 	import { onMount, tick } from 'svelte'
@@ -176,8 +176,35 @@
 		temperature = data.temperature
 		// set temperature
 	}
+
+	const getWind = async () => {
+		// await 
+		const res = await fetch(`http://sprint-2-weather-microservice.vercel.app/weather?city=Vancouver&country=CA`)
+		if (!(res.status === 200)) {
+			console.log(res)
+			return
+		}
+		const data = await res.json()
+		console.log(data)
+		$wind_speed = data.weather.wind_speed_10m
+		// set temperature
+	}
+
+	const getUV = async () => {
+		// await 
+		const res = await fetch(`http://cs361-sprint-3-pollen.vercel.app/api/main`)
+		if (!(res.status === 200)) {
+			console.log(res)
+			return
+		}
+		const data = await res.json()
+		$uv_index = data.uv_index
+	}
+
 	onMount(() => {
 		getTemperature()
+		getWind()
+		getUV()
 	})
 </script>
 
@@ -187,6 +214,10 @@
 	{@render children()}
 
 	<div class="absolute left-5 top-5 text-white text-lg">{temperature}C</div>
+
+	<div class="absolute left-5 top-10 text-white text-lg">wind speed: {$wind_speed}m/s</div>
+
+	<div class="absolute left-5 top-15 text-white text-lg">uv index: {$uv_index}</div>
 
 	{#if $scene === 'none'}
 		<Q>
