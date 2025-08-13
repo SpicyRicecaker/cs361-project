@@ -687,7 +687,11 @@
 				this.raindropsMeshMaterial.vertexNode = this.raindropsMeshVertexNode
 				this.raindropsMeshMaterial.fragmentNode = Fn(() => {
 					raindropIDInterpolators.greaterThanEqual(this.raindropEnabledN).discard()
-					return raindropsDepthInterpolators.mul(color(0.7, 0.7, 0.7))
+					// get the color based off of the color palette
+					const colorID = raindropIDInterpolators.mod(this.paletteN)
+					const colorActual = this.paletteColors.element(colorID)
+
+					return raindropsDepthInterpolators.mul(colorActual)
 					// return color(0.7, 0.7, 0.7)
 				})()
 
@@ -1046,13 +1050,15 @@
 							)
 							.discard()
 
+					const colorID = waveletIDInterpolators.mod(this.paletteN)
+					const colorActual = this.paletteColors.element(colorID)
 					// distance.greaterThan(0.01).discard()
 					
 					// return color(1, 1, 1)
 					// return distance.mul(color(1, 1, 1))
 					// return wavelet.get('innerRadius').mul(color(1, 1, 1))
 					// return wavelet.get('outerRadius').mul(color(1, 1, 1))
-					return waveletsDepthInterpolators.mul(color(1, 1, 1).mul(0.6))
+					return waveletsDepthInterpolators.mul(colorActual.mul(0.6))
 				})()
 
 				// region wavelet physics
@@ -1354,6 +1360,42 @@
 			await this.renderer.computeAsync(this.raindropsInit)
 
 			await this.renderer.computeAsync(this.initGPUSushiPlate)
+
+			// set colors
+			this.paletteN = uniform(3)
+			this.paletteColors = await (async () => {
+				const res = await fetch("https://cs361-sprint-3-color.vercel.app/api/main", {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(
+						{
+							monochrome: false,
+							n: this.paletteN.value
+						}
+					)
+				})
+				if (!(res.status === 200)) {
+					console.log(res)
+					return
+				}
+
+				// code from dtasev on stack overflow
+				function hexToRgb(hex) {
+					var bigint = parseInt(hex, 16);
+					var r = (bigint >> 16) & 255;
+					var g = (bigint >> 8) & 255;
+					var b = bigint & 255;
+					return new THREE.Color(r / 255, g / 255, b / 255)
+				}
+				let data = await res.json()
+				data = JSON.parse(data['color'])
+				data = data.map((h) => hexToRgb(h.substring(1)))
+				data = new Float32Array(data.flatMap(c => [...c.toArray(), 0.]));
+
+				return instancedArray(data, 'vec3')
+			})()
 
 			// region init
 			await this.renderer.setAnimationLoop(this.gameLoop)

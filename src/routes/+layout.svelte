@@ -3,7 +3,7 @@
 	import { game, sleep, scene, gameLoaded, enabledRaindrops } from '$lib/store';
 	import Polaroid from '$lib/Polaroid.svelte'
 	import * as THREE from "three/webgpu"
-	import { tick } from 'svelte'
+	import { onMount, tick } from 'svelte'
 	import Drag from '$lib/Drop.svelte'
 	import X from '$lib/X.svelte'
 	import Q from '$lib/Q.svelte'
@@ -152,12 +152,41 @@
 				: {fake: true}
 	))
 
+	let temperature = $state(0)
+
+	const getTemperature = async () => {
+		// await 
+		const res = await fetch("https://cs361-sprint-3-temperature.vercel.app/api/main", {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(
+				{
+					average: false,
+				}
+			)
+		})
+		if (!(res.status === 200)) {
+			console.log(res)
+			return
+		}
+		const data = await res.json()
+		console.log(data)
+		temperature = data.temperature
+		// set temperature
+	}
+	onMount(() => {
+		getTemperature()
+	})
 </script>
 
 <svelte:window on:keydown={(e) => handleKeyDown(e)}></svelte:window>
 
 <div class="wrapper p-8 relative">
 	{@render children()}
+
+	<div class="absolute left-5 top-5 text-white text-lg">{temperature}C</div>
 
 	{#if $scene === 'none'}
 		<Q>
